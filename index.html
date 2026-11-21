@@ -1,0 +1,2260 @@
+<!DOCTYPE html>
+<html lang="fr" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Supervision GTB & Performance Énergétique — Dexforma</title>
+
+    <!-- Polices techniques Inter & JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        dexBg: '#0B1120',
+                        dexCard: '#111827',
+                        dexSurface: '#1E293B',
+                        dexBorder: '#334155',
+                        dexCyan: '#38BDF8',
+                        dexOrange: '#EA580C',
+                        dexEmerald: '#10B981',
+                        dexRed: '#EF4444',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Fallback & styles industriels haute précision */
+        :root {
+            --bg-main: #0B1120;
+            --bg-card: #111827;
+            --bg-surface: #1E293B;
+            --border-std: #334155;
+            --accent-cyan: #38BDF8;
+            --accent-orange: #EA580C;
+            --accent-emerald: #10B981;
+            --accent-red: #EF4444;
+        }
+
+        body {
+            background-color: var(--bg-main);
+            color: #F8FAFC;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-image:
+                radial-gradient(circle at 14% 10%, rgba(56, 189, 248, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 86% 88%, rgba(234, 88, 12, 0.06) 0%, transparent 40%);
+        }
+
+        /* Animations supervision GTB & SSI */
+        @keyframes pulseAlarm {
+            0%, 100% { opacity: 1; box-shadow: 0 0 22px rgba(239, 68, 68, 0.65); }
+            50% { opacity: 0.45; box-shadow: 0 0 6px rgba(239, 68, 68, 0.2); }
+        }
+        .alarm-flash {
+            animation: pulseAlarm 0.85s ease-in-out infinite;
+        }
+
+        @keyframes isoDataFlow {
+            to { stroke-dashoffset: -28; }
+        }
+        .iso-bus-flow {
+            stroke-dasharray: 6 8;
+            animation: isoDataFlow 1.2s linear infinite;
+        }
+
+        @keyframes fanRotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .fan-spin {
+            transform-origin: center;
+            animation: fanRotate 1.8s linear infinite;
+        }
+
+        /* Curseurs industriels */
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            background: transparent;
+            cursor: pointer;
+        }
+        input[type="range"]::-webkit-slider-runnable-track {
+            height: 6px;
+            border-radius: 999px;
+            background: #1E293B;
+            border: 1px solid #334155;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #38BDF8;
+            border: 2px solid #0B1120;
+            margin-top: -6px;
+            box-shadow: 0 0 8px rgba(56, 189, 248, 0.7);
+        }
+
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #0B1120; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 999px; }
+
+        /* Impression PDF Rapport d'Intervention */
+        @media print {
+            body { background: #FFFFFF !important; color: #0F172A !important; background-image: none !important; }
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col antialiased selection:bg-dexCyan selection:text-dexBg">
+
+    <!-- Conteneur Notifications Toast -->
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none no-print"></div>
+
+    <!-- ===================================================================== -->
+    <!-- BANDEAU ALERTE INCENDIE SSI GLOBALE (Affiché uniquement en alarme)    -->
+    <!-- ===================================================================== -->
+    <div id="ssi-emergency-banner" class="hidden bg-red-600 text-white border-b-2 border-red-300 px-4 py-3 shadow-2xl alarm-flash no-print">
+        <div class="max-w-[1600px] mx-auto flex flex-col md:flex-row items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <span class="px-2.5 py-1 rounded-lg bg-white text-red-700 font-mono font-extrabold text-xs uppercase tracking-wider">
+                    ALARME FEU SSI
+                </span>
+                <div class="text-xs sm:text-sm font-extrabold">
+                    SINISTRE DÉTECTÉ — <span id="ssi-banner-zone" class="underline">OPEN SPACE NORD</span> • CTA À L'ARRÊT • CLAPETS COUPE-FEU FERMÉS • DÉSENFUMAGE 100 %
+                </div>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+                <button type="button" onclick="switchMainTab('ssi')" class="px-3 py-1.5 rounded-xl bg-red-950/70 hover:bg-red-950 text-white text-xs font-bold border border-red-300/40 cursor-pointer">
+                    Ouvrir Centrale SSI
+                </button>
+                <button type="button" onclick="resetFireAlarm()" class="px-3.5 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-red-700 text-xs font-extrabold shadow cursor-pointer">
+                    ✓ Levée de doute &amp; Réarmement SSI
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- 1. HEADER & SÉLECTEUR DE MODES D'EXPLOITATION DU BÂTIMENT             -->
+    <!-- ===================================================================== -->
+    <header class="bg-dexCard/95 backdrop-blur-md border-b border-dexBorder shadow-xl no-print">
+        <div class="max-w-[1600px] mx-auto px-4 sm:px-6 py-3.5 space-y-3.5">
+
+            <!-- Ligne 1 : Identité Dexforma, Badges Réglementaires, Horloge & Actions Terrain -->
+            <div class="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3">
+                <div class="flex items-center gap-3">
+                    <div class="px-3 py-2 rounded-xl bg-gradient-to-br from-dexOrange to-amber-600 text-white font-extrabold text-xs tracking-widest uppercase shadow-lg shrink-0">
+                        DEXFORMA
+                    </div>
+                    <div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <h1 class="text-base sm:text-lg md:text-xl font-extrabold text-white tracking-tight">
+                                Supervision GTB &amp; Performance Énergétique — Dexforma
+                            </h1>
+                            <span class="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-dexCyan/15 text-dexCyan border border-dexCyan/30">
+                                DÉCRET BACS • CLASSE A
+                            </span>
+                            <span id="global-bus-status" class="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                                ● BACnet IP / KNX EN LIGNE
+                            </span>
+                        </div>
+                        <p class="text-xs text-slate-400">
+                            Bâtiment Tertiaire Intelligent Multi-Lots (1 200 m²) • CVC, Qualité d'Air CO₂, Éclairage, Stores Solaires &amp; SSI
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Horloge simulée + Configuration Rapide + Export PDF -->
+                <div class="flex flex-wrap items-center gap-2">
+                    <div class="px-3 py-1.5 rounded-xl bg-dexBg border border-dexBorder flex items-center gap-2 text-xs font-mono">
+                        <span class="text-slate-400">Heure Site :</span>
+                        <strong id="sim-clock-display" class="text-dexCyan font-extrabold">10:30</strong>
+                        <span id="sim-day-display" class="text-slate-400">(Mardi)</span>
+                    </div>
+
+                    <button type="button" onclick="toggleConfigDrawer()" class="px-3 py-2 rounded-xl bg-dexSurface hover:bg-slate-700 border border-dexBorder text-dexCyan text-xs font-bold flex items-center gap-1.5 transition cursor-pointer">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                        <span>Seuils &amp; Consignes</span>
+                    </button>
+
+                    <button type="button" onclick="exportPdfReport()" class="px-3.5 py-2 rounded-xl bg-dexOrange hover:bg-orange-500 text-white text-xs font-extrabold shadow-lg flex items-center gap-1.5 transition cursor-pointer">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                        <span>Export Rapport d'Intervention PDF</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Ligne 2 : Sélecteur des 4 Modes d'Exploitation + Météo Extérieure + Vitesse Sim -->
+            <div class="pt-3 border-t border-dexBorder/80 grid grid-cols-1 xl:grid-cols-12 gap-3 items-center">
+
+                <!-- 4 Modes d'Exploitation du Bâtiment (7 colonnes) -->
+                <div class="xl:col-span-7 flex flex-wrap items-center gap-2">
+                    <span class="text-xs font-bold text-slate-400 mr-1 flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-dexCyan"></span>
+                        <span>Mode Bâtiment :</span>
+                    </span>
+                    <button type="button" id="mode-btn-confort" onclick="setBuildingMode('confort')" class="px-3 py-1.5 rounded-xl border text-xs font-extrabold transition cursor-pointer bg-dexCyan/15 border-dexCyan text-dexCyan shadow">
+                        ☀ Confort (Occupation)
+                    </button>
+                    <button type="button" id="mode-btn-nuit" onclick="setBuildingMode('nuit')" class="px-3 py-1.5 rounded-xl border text-xs font-bold transition cursor-pointer bg-dexSurface border-dexBorder text-slate-300 hover:text-white">
+                        ☾ Nuit / Inoccupé
+                    </button>
+                    <button type="button" id="mode-btn-weekend" onclick="setBuildingMode('weekend')" class="px-3 py-1.5 rounded-xl border text-xs font-bold transition cursor-pointer bg-dexSurface border-dexBorder text-slate-300 hover:text-white">
+                        📅 Week-end / Jours fériés
+                    </button>
+                    <button type="button" id="mode-btn-derogation" onclick="setBuildingMode('derogation')" class="px-3 py-1.5 rounded-xl border text-xs font-bold transition cursor-pointer bg-dexSurface border-dexBorder text-amber-300 hover:text-amber-200">
+                        ⚡ Dérogation / Événement
+                    </button>
+                </div>
+
+                <!-- Slider Température Extérieure + Contrôle Temps (5 colonnes) -->
+                <div class="xl:col-span-5 flex flex-wrap items-center justify-start xl:justify-end gap-3">
+                    <div class="flex items-center gap-2.5 bg-dexBg border border-dexBorder px-3 py-1.5 rounded-xl">
+                        <span class="text-xs text-slate-400 font-semibold">T° Ext :</span>
+                        <input type="range" id="slider-ext-temp" min="-8" max="38" step="0.5" value="8.0" oninput="updateOutdoorTemp(this.value)" class="w-24 sm:w-28">
+                        <strong id="ext-temp-display" class="font-mono text-xs font-extrabold text-dexCyan w-12 text-right">8.0 °C</strong>
+                    </div>
+
+                    <div class="flex items-center gap-1.5">
+                        <button type="button" id="btn-sim-pause" onclick="toggleSimPause()" class="px-2.5 py-1.5 rounded-xl bg-dexSurface hover:bg-slate-700 border border-dexBorder text-xs font-bold text-white cursor-pointer">
+                            ⏸ Pause
+                        </button>
+                        <div class="flex items-center bg-dexBg border border-dexBorder rounded-xl p-0.5">
+                            <button type="button" id="speed-1" onclick="setSimSpeed(1)" class="px-2 py-1 rounded-lg text-[10px] font-mono font-bold bg-dexCyan text-dexBg cursor-pointer">1x</button>
+                            <button type="button" id="speed-5" onclick="setSimSpeed(5)" class="px-2 py-1 rounded-lg text-[10px] font-mono font-bold text-slate-400 hover:text-white cursor-pointer">5x</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- ===================================================================== -->
+    <!-- NAVIGATION PRINCIPALE PAR ONGLETS                                     -->
+    <!-- ===================================================================== -->
+    <nav class="bg-dexSurface/60 border-b border-dexBorder px-4 sm:px-6 py-2.5 no-print">
+        <div class="max-w-[1600px] mx-auto flex items-center justify-between gap-3 overflow-x-auto">
+            <div class="flex items-center gap-2">
+                <button type="button" id="nav-tab-synoptic" onclick="switchMainTab('synoptic')" class="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-dexCyan text-dexBg shadow-md shrink-0 transition cursor-pointer">
+                    1. Synoptique Bâtiment &amp; Zonage CVC
+                </button>
+                <button type="button" id="nav-tab-energy" onclick="switchMainTab('energy')" class="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold text-slate-300 hover:bg-dexSurface shrink-0 transition cursor-pointer">
+                    2. Analyse Énergétique &amp; Courbes
+                </button>
+                <button type="button" id="nav-tab-ssi" onclick="switchMainTab('ssi')" class="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold text-slate-300 hover:bg-dexSurface shrink-0 transition flex items-center gap-2 cursor-pointer">
+                    <span>3. Sécurité Incendie (SSI) &amp; Alarmes</span>
+                    <span id="nav-alarm-counter" class="px-2 py-0.5 rounded-full text-[11px] font-mono font-extrabold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">0</span>
+                </button>
+                <button type="button" id="nav-tab-cases" onclick="switchMainTab('cases')" class="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold text-slate-300 hover:bg-dexSurface shrink-0 transition flex items-center gap-2 cursor-pointer">
+                    <span>4. Cas Pratiques / Formation</span>
+                    <span id="nav-quiz-badge" class="px-2 py-0.5 rounded-full text-[11px] font-mono font-extrabold bg-dexOrange/20 text-dexOrange border border-dexOrange/40">0 / 10</span>
+                </button>
+            </div>
+
+            <!-- Indicateurs synthèse rapides -->
+            <div class="hidden xl:flex items-center gap-4 text-xs font-mono shrink-0">
+                <span class="text-slate-400">Puissance Totale : <strong id="nav-kpi-kw" class="text-white">34.2 kW</strong></span>
+                <span class="text-slate-400">CO₂ Moyen : <strong id="nav-kpi-co2" class="text-dexEmerald">640 ppm</strong></span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- ===================================================================== -->
+    <!-- 6. PANNEAU DE CONFIGURATION RAPIDE (SEUILS CO2, CONSIGNES, TARIF)     -->
+    <!-- ===================================================================== -->
+    <section id="config-drawer" class="hidden bg-dexCard border-b-2 border-dexCyan/50 shadow-2xl no-print">
+        <div class="max-w-[1600px] mx-auto px-4 sm:px-6 py-4 space-y-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <span class="px-2 py-0.5 rounded bg-dexCyan/20 text-dexCyan font-mono font-bold text-xs">PARAMÉTRAGE GTB</span>
+                    <h2 class="text-sm sm:text-base font-extrabold text-white">Configuration Rapide des Seuils d'Alarme CO₂, Consignes &amp; Coût Énergie</h2>
+                </div>
+                <button type="button" onclick="toggleConfigDrawer()" class="px-2.5 py-1 rounded-lg bg-dexSurface hover:bg-slate-700 text-xs font-bold text-slate-300 cursor-pointer">
+                    Fermer ✕
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 text-xs">
+                <div class="p-3 rounded-xl bg-dexBg border border-dexBorder space-y-1">
+                    <label class="font-bold text-amber-400 block">Seuil Pré-alarme CO₂ (ppm)</label>
+                    <input type="number" id="cfg-co2-warn" value="800" min="500" max="1100" step="50" onchange="applyQuickConfig()" class="w-full px-2.5 py-1.5 rounded-lg bg-dexCard border border-dexBorder font-mono font-bold text-white">
+                </div>
+                <div class="p-3 rounded-xl bg-dexBg border border-dexBorder space-y-1">
+                    <label class="font-bold text-red-400 block">Seuil Alarme Critique CO₂ (ppm)</label>
+                    <input type="number" id="cfg-co2-crit" value="1200" min="900" max="2000" step="50" onchange="applyQuickConfig()" class="w-full px-2.5 py-1.5 rounded-lg bg-dexCard border border-dexBorder font-mono font-bold text-white">
+                </div>
+                <div class="p-3 rounded-xl bg-dexBg border border-dexBorder space-y-1">
+                    <label class="font-bold text-dexCyan block">Consigne Base Confort (°C)</label>
+                    <input type="number" id="cfg-temp-confort" value="21.0" min="18" max="24" step="0.5" onchange="applyQuickConfig()" class="w-full px-2.5 py-1.5 rounded-lg bg-dexCard border border-dexBorder font-mono font-bold text-white">
+                </div>
+                <div class="p-3 rounded-xl bg-dexBg border border-dexBorder space-y-1">
+                    <label class="font-bold text-indigo-400 block">Consigne Réduit Nuit (°C)</label>
+                    <input type="number" id="cfg-temp-nuit" value="16.5" min="12" max="19" step="0.5" onchange="applyQuickConfig()" class="w-full px-2.5 py-1.5 rounded-lg bg-dexCard border border-dexBorder font-mono font-bold text-white">
+                </div>
+                <div class="p-3 rounded-xl bg-dexBg border border-dexBorder space-y-1">
+                    <label class="font-bold text-dexEmerald block">Tarif Énergie (€ / kWh)</label>
+                    <input type="number" id="cfg-kwh-price" value="0.21" min="0.05" max="1.0" step="0.01" onchange="applyQuickConfig()" class="w-full px-2.5 py-1.5 rounded-lg bg-dexCard border border-dexBorder font-mono font-bold text-white">
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===================================================================== -->
+    <!-- CONTENU PRINCIPAL                                                     -->
+    <!-- ===================================================================== -->
+    <main class="flex-1 max-w-[1600px] w-full mx-auto px-4 sm:px-6 py-5">
+
+        <!-- ================================================================= -->
+        <!-- VUE 1 : SYNOPTIQUE ISOMÉTRIQUE DU BÂTIMENT & ZONAGE INTERACTIF    -->
+        <!-- ================================================================= -->
+        <section id="view-synoptic" class="space-y-5">
+
+            <!-- Bandeau supérieur des 4 KPI Temps Réel du Bâtiment -->
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+                <div class="bg-dexCard border border-dexBorder rounded-2xl p-4 shadow">
+                    <div class="flex items-center justify-between text-xs text-slate-400">
+                        <span class="font-bold uppercase">Température Moyenne</span>
+                        <span id="kpi-mode-tag" class="px-2 py-0.5 rounded bg-dexCyan/15 text-dexCyan font-mono text-[10px] font-bold">CONFORT</span>
+                    </div>
+                    <div class="mt-1.5 flex items-baseline justify-between">
+                        <strong id="kpi-avg-temp" class="text-2xl font-mono font-extrabold text-white">21.1 °C</strong>
+                        <span id="kpi-avg-sp" class="text-xs font-mono text-slate-400">Consigne: 21.0°C</span>
+                    </div>
+                </div>
+
+                <div class="bg-dexCard border border-dexBorder rounded-2xl p-4 shadow">
+                    <div class="flex items-center justify-between text-xs text-slate-400">
+                        <span class="font-bold uppercase">Qualité d'Air (CO₂ Max)</span>
+                        <span id="kpi-co2-status" class="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-mono text-[10px] font-bold">OPTIMALE</span>
+                    </div>
+                    <div class="mt-1.5 flex items-baseline justify-between">
+                        <strong id="kpi-max-co2" class="text-2xl font-mono font-extrabold text-dexEmerald">720 ppm</strong>
+                        <span id="kpi-total-flow" class="text-xs font-mono text-slate-400">Débit: 4 250 m³/h</span>
+                    </div>
+                </div>
+
+                <div class="bg-dexCard border border-dexBorder rounded-2xl p-4 shadow">
+                    <div class="flex items-center justify-between text-xs text-slate-400">
+                        <span class="font-bold uppercase">Appel Puissance &amp; Solaire</span>
+                        <span class="px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 font-mono text-[10px] font-bold">COMPTEURS</span>
+                    </div>
+                    <div class="mt-1.5 flex items-baseline justify-between">
+                        <strong id="kpi-power-kw" class="text-2xl font-mono font-extrabold text-dexOrange">34.2 kW</strong>
+                        <span id="kpi-solar-kw" class="text-xs font-mono text-emerald-400">PV: -6.8 kW</span>
+                    </div>
+                </div>
+
+                <div class="bg-dexCard border border-dexBorder rounded-2xl p-4 shadow">
+                    <div class="flex items-center justify-between text-xs text-slate-400">
+                        <span class="font-bold uppercase">Supervision SSI &amp; CTA</span>
+                        <span id="kpi-ssi-badge" class="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-mono text-[10px] font-bold">VEILLE NORMALE</span>
+                    </div>
+                    <div class="mt-1.5 flex items-center justify-between gap-2">
+                        <strong id="kpi-cta-state" class="text-sm sm:text-base font-mono font-extrabold text-white">CTA : MARCHE AUTO</strong>
+                        <button type="button" onclick="triggerFireAlarm()" class="px-2.5 py-1 rounded-lg bg-red-500/20 hover:bg-red-600 border border-red-500/50 text-red-300 hover:text-white text-[11px] font-extrabold transition cursor-pointer">
+                            🔥 Test Feu
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Grille Principale : Synoptique Isométrique (7 col) + Détail Zone & Commandes (5 col) -->
+            <div class="grid grid-cols-1 xl:grid-cols-12 gap-5 items-start">
+
+                <!-- SYNOPTIQUE ISOMÉTRIQUE BÂTIMENT MULTI-LOTS (7 colonnes) -->
+                <div class="xl:col-span-7 bg-dexCard border border-dexBorder rounded-2xl p-4 sm:p-5 shadow-xl space-y-3">
+                    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-dexBorder pb-2.5">
+                        <div>
+                            <span class="text-[11px] font-mono font-bold uppercase tracking-wider text-dexCyan">
+                                ARCHITECTURE BÂTIMENT INTELLIGENT — COUPE ISOMÉTRIQUE GTB
+                            </span>
+                            <h2 class="text-sm sm:text-base font-extrabold text-white">
+                                Noyau Processeur Numérique &amp; Réseaux Multi-Lots Connectés
+                            </h2>
+                        </div>
+                        <span class="text-[11px] text-slate-400 font-mono">Cliquez sur un local du bâtiment</span>
+                    </div>
+
+                    <!-- SVG Isométrique inspiré des visuels de référence -->
+                    <div class="w-full overflow-x-auto bg-dexBg border border-dexBorder rounded-xl p-2">
+                        <svg viewBox="0 0 860 510" class="w-full min-w-[640px] h-auto select-none">
+                            <defs>
+                                <pattern id="isoTechGrid" width="24" height="24" patternUnits="userSpaceOnUse">
+                                    <path d="M 24 0 L 0 0 0 24" fill="none" stroke="#1E293B" stroke-width="0.6" />
+                                </pattern>
+                                <linearGradient id="isoRoofGrad" x1="0" y1="0" x2="1" y2="1">
+                                    <stop offset="0%" stop-color="#1E293B" />
+                                    <stop offset="100%" stop-color="#0F172A" />
+                                </linearGradient>
+                                <linearGradient id="cpuGlow" x1="0" y1="0" x2="1" y2="1">
+                                    <stop offset="0%" stop-color="#38BDF8" stop-opacity="0.35" />
+                                    <stop offset="100%" stop-color="#10B981" stop-opacity="0.2" />
+                                </linearGradient>
+                            </defs>
+
+                            <rect width="860" height="510" fill="url(#isoTechGrid)" rx="12" />
+
+                            <!-- ========================================================= -->
+                            <!-- ICÔNES PÉRIPHÉRIQUES MULTI-LOTS (Style Visuel Référence)  -->
+                            <!-- ========================================================= -->
+                            <!-- 1. Conduits CVC (Haut Gauche) -->
+                            <g transform="translate(24, 24)">
+                                <rect width="152" height="64" rx="12" fill="#111827" stroke="#38BDF8" stroke-width="1.5" />
+                                <circle cx="32" cy="32" r="18" fill="#1E293B" stroke="#38BDF8" stroke-width="1.8" />
+                                <g id="iso-cta-fan" class="fan-spin" style="transform-origin: 32px 32px;">
+                                    <line x1="22" y1="32" x2="42" y2="32" stroke="#38BDF8" stroke-width="2.5" />
+                                    <line x1="32" y1="22" x2="32" y2="42" stroke="#38BDF8" stroke-width="2.5" />
+                                </g>
+                                <text x="60" y="27" fill="#F8FAFC" font-family="Inter" font-weight="800" font-size="10.5">CONDUITS CVC</text>
+                                <text id="iso-cta-sub" x="60" y="43" fill="#38BDF8" font-family="JetBrains Mono" font-weight="700" font-size="10">CTA: 4 250 m³/h</text>
+                            </g>
+                            <polyline points="176,56 260,56 315,115" fill="none" stroke="#38BDF8" stroke-width="1.8" class="iso-bus-flow" />
+
+                            <!-- 2. Éclairage Intelligent (Milieu Gauche) -->
+                            <g transform="translate(24, 200)">
+                                <rect width="152" height="64" rx="12" fill="#111827" stroke="#10B981" stroke-width="1.5" />
+                                <circle cx="32" cy="32" r="16" fill="#10B981" fill-opacity="0.18" stroke="#10B981" stroke-width="1.8" />
+                                <text x="32" y="37" text-anchor="middle" font-size="16">💡</text>
+                                <text x="58" y="27" fill="#F8FAFC" font-family="Inter" font-weight="800" font-size="10.5">ÉCLAIRAGE DALI</text>
+                                <text id="iso-light-sub" x="58" y="43" fill="#10B981" font-family="JetBrains Mono" font-weight="700" font-size="10">Gradation: 85%</text>
+                            </g>
+                            <line x1="176" y1="232" x2="255" y2="232" stroke="#10B981" stroke-width="1.8" class="iso-bus-flow" />
+
+                            <!-- 3. Compteurs Électriques & Solaire (Bas Gauche) -->
+                            <g transform="translate(24, 385)">
+                                <rect width="162" height="68" rx="12" fill="#111827" stroke="#EA580C" stroke-width="1.5" />
+                                <circle cx="32" cy="34" r="16" fill="#EA580C" fill-opacity="0.18" stroke="#EA580C" stroke-width="1.8" />
+                                <text x="32" y="39" text-anchor="middle" font-size="15">⚡</text>
+                                <text x="58" y="28" fill="#F8FAFC" font-family="Inter" font-weight="800" font-size="10.5">COMPTAGE &amp; PV</text>
+                                <text id="iso-meter-sub" x="58" y="45" fill="#EA580C" font-family="JetBrains Mono" font-weight="700" font-size="10">Net: 27.4 kW</text>
+                            </g>
+                            <polyline points="186,418 280,418 330,375" fill="none" stroke="#EA580C" stroke-width="1.8" class="iso-bus-flow" />
+
+                            <!-- 4. Sécurité & SSI (Haut Droite) -->
+                            <g transform="translate(684, 24)">
+                                <rect id="iso-sec-card" width="152" height="64" rx="12" fill="#111827" stroke="#38BDF8" stroke-width="1.5" />
+                                <circle cx="32" cy="32" r="16" fill="#38BDF8" fill-opacity="0.18" stroke="#38BDF8" stroke-width="1.8" />
+                                <text x="32" y="37" text-anchor="middle" font-size="15">🛡️</text>
+                                <text x="58" y="27" fill="#F8FAFC" font-family="Inter" font-weight="800" font-size="10.5">SÉCURITÉ &amp; SSI</text>
+                                <text id="iso-sec-sub" x="58" y="43" fill="#10B981" font-family="JetBrains Mono" font-weight="700" font-size="10">SSI : Normal</text>
+                            </g>
+                            <polyline points="684,56 600,56 545,115" fill="none" stroke="#38BDF8" stroke-width="1.8" class="iso-bus-flow" />
+
+                            <!-- 5. Stores Solaires Automatisés (Bas Droite) -->
+                            <g transform="translate(684, 385)">
+                                <rect width="152" height="68" rx="12" fill="#111827" stroke="#F59E0B" stroke-width="1.5" />
+                                <circle cx="32" cy="34" r="16" fill="#F59E0B" fill-opacity="0.18" stroke="#F59E0B" stroke-width="1.8" />
+                                <text x="32" y="39" text-anchor="middle" font-size="15">🪟</text>
+                                <text x="58" y="28" fill="#F8FAFC" font-family="Inter" font-weight="800" font-size="10.5">STORES SOLAIRES</text>
+                                <text id="iso-blinds-sub" x="58" y="45" fill="#F59E0B" font-family="JetBrains Mono" font-weight="700" font-size="10">Fermeture: 30%</text>
+                            </g>
+                            <polyline points="684,418 585,418 530,375" fill="none" stroke="#F59E0B" stroke-width="1.8" class="iso-bus-flow" />
+
+                            <!-- ========================================================= -->
+                            <!-- STRUCTURE ISOMÉTRIQUE CENTRALE DU BÂTIMENT (3 NIVEAUX)     -->
+                            <!-- ========================================================= -->
+                            <!-- Toiture & Panneaux Solaires Photovoltaïques -->
+                            <polygon points="430,46 620,132 430,218 240,132" fill="url(#isoRoofGrad)" stroke="#38BDF8" stroke-width="2" />
+                            <!-- Panneaux PV sur toiture -->
+                            <g transform="translate(385, 74)">
+                                <polygon points="45,0 115,32 70,52 0,20" fill="#0284C7" fill-opacity="0.45" stroke="#38BDF8" stroke-width="1.4" />
+                                <line x1="22" y1="10" x2="92" y2="42" stroke="#38BDF8" stroke-width="0.9" />
+                                <line x1="57" y1="26" x2="35" y2="36" stroke="#38BDF8" stroke-width="0.9" />
+                                <text x="58" y="-6" text-anchor="middle" fill="#38BDF8" font-family="JetBrains Mono" font-weight="700" font-size="9">SOLAIRE PV TOITURE</text>
+                            </g>
+
+                            <!-- NIVEAU R+2 (Zones 1 & 2 : Open Space Nord + Open Space Sud) -->
+                            <!-- Zone 1 : Open Space Nord (Gauche R+2) -->
+                            <g id="iso-zone-open_nord" onclick="selectZone('open_nord')" class="cursor-pointer transition-opacity hover:opacity-95">
+                                <polygon id="poly-open_nord" points="240,132 430,218 430,295 240,209" fill="#111827" stroke="#38BDF8" stroke-width="2.5" />
+                                <text x="335" y="198" text-anchor="middle" fill="#F8FAFC" font-family="Inter" font-weight="800" font-size="11">OPEN SPACE NORD</text>
+                                <text id="iso-txt-open_nord" x="335" y="216" text-anchor="middle" fill="#10B981" font-family="JetBrains Mono" font-weight="700" font-size="10.5">21.2°C • 680 ppm</text>
+                            </g>
+
+                            <!-- Zone 2 : Open Space Sud (Droite R+2) -->
+                            <g id="iso-zone-open_sud" onclick="selectZone('open_sud')" class="cursor-pointer transition-opacity hover:opacity-95">
+                                <polygon id="poly-open_sud" points="430,218 620,132 620,209 430,295" fill="#111827" stroke="#334155" stroke-width="2" />
+                                <text x="525" y="198" text-anchor="middle" fill="#F8FAFC" font-family="Inter" font-weight="800" font-size="11">OPEN SPACE SUD</text>
+                                <text id="iso-txt-open_sud" x="525" y="216" text-anchor="middle" fill="#10B981" font-family="JetBrains Mono" font-weight="700" font-size="10.5">21.5°C • 640 ppm</text>
+                            </g>
+
+                            <!-- NIVEAU R+1 (Zones 3 & 4 : Salle Réunion A + Salle Réunion B) -->
+                            <!-- Zone 3 : Salle Réunion A (Gauche R+1) -->
+                            <g id="iso-zone-reunion_a" onclick="selectZone('reunion_a')" class="cursor-pointer transition-opacity hover:opacity-95">
+                                <polygon id="poly-reunion_a" points="240,209 430,295 430,372 240,286" fill="#1E293B" stroke="#334155" stroke-width="2" />
+                                <text x="335" y="275" text-anchor="middle" fill="#F8FAFC" font-family="Inter" font-weight="800" font-size="11">SALLE RÉUNION A</text>
+                                <text id="iso-txt-reunion_a" x="335" y="293" text-anchor="middle" fill="#10B981" font-family="JetBrains Mono" font-weight="700" font-size="10.5">21.0°C • 750 ppm</text>
+                            </g>
+
+                            <!-- Zone 4 : Salle Réunion B (Droite R+1) -->
+                            <g id="iso-zone-reunion_b" onclick="selectZone('reunion_b')" class="cursor-pointer transition-opacity hover:opacity-95">
+                                <polygon id="poly-reunion_b" points="430,295 620,209 620,286 430,372" fill="#1E293B" stroke="#334155" stroke-width="2" />
+                                <text x="525" y="275" text-anchor="middle" fill="#F8FAFC" font-family="Inter" font-weight="800" font-size="11">SALLE RÉUNION B</text>
+                                <text id="iso-txt-reunion_b" x="525" y="293" text-anchor="middle" fill="#10B981" font-family="JetBrains Mono" font-weight="700" font-size="10.5">20.9°C • 590 ppm</text>
+                            </g>
+
+                            <!-- NIVEAU RDC (Zones 5 & 6 : Bureaux Direction + Hall & Sanitaires) -->
+                            <!-- Zone 5 : Bureaux Direction (Gauche RDC) -->
+                            <g id="iso-zone-direction" onclick="selectZone('direction')" class="cursor-pointer transition-opacity hover:opacity-95">
+                                <polygon id="poly-direction" points="240,286 430,372 430,448 240,362" fill="#111827" stroke="#334155" stroke-width="2" />
+                                <text x="335" y="352" text-anchor="middle" fill="#F8FAFC" font-family="Inter" font-weight="800" font-size="11">BUREAUX DIRECTION</text>
+                                <text id="iso-txt-direction" x="335" y="370" text-anchor="middle" fill="#10B981" font-family="JetBrains Mono" font-weight="700" font-size="10.5">21.3°C • 520 ppm</text>
+                            </g>
+
+                            <!-- Zone 6 : Hall & Sanitaires (Droite RDC) -->
+                            <g id="iso-zone-hall" onclick="selectZone('hall')" class="cursor-pointer transition-opacity hover:opacity-95">
+                                <polygon id="poly-hall" points="430,372 620,286 620,362 430,448" fill="#111827" stroke="#334155" stroke-width="2" />
+                                <text x="525" y="352" text-anchor="middle" fill="#F8FAFC" font-family="Inter" font-weight="800" font-size="11">HALL &amp; SANITAIRES</text>
+                                <text id="iso-txt-hall" x="525" y="370" text-anchor="middle" fill="#10B981" font-family="JetBrains Mono" font-weight="700" font-size="10.5">20.2°C • 490 ppm</text>
+                            </g>
+
+                            <!-- NOYAU CENTRAL PROCESSEUR NUMÉRIQUE GTB (Superposé au cœur) -->
+                            <g transform="translate(362, 212)">
+                                <rect width="136" height="44" rx="10" fill="#0B1120" stroke="#38BDF8" stroke-width="2" />
+                                <rect x="3" y="3" width="130" height="38" rx="8" fill="url(#cpuGlow)" />
+                                <text x="68" y="19" text-anchor="middle" fill="#38BDF8" font-family="JetBrains Mono" font-weight="800" font-size="9.5">NOYAU AUTOMATE GTB</text>
+                                <text x="68" y="33" text-anchor="middle" fill="#F8FAFC" font-family="JetBrains Mono" font-weight="700" font-size="9">Supervision Temps Réel</text>
+                            </g>
+
+                            <!-- Légende code couleur CO2 en bas -->
+                            <g transform="translate(230, 474)">
+                                <circle cx="10" cy="6" r="5" fill="#10B981" />
+                                <text x="22" y="10" fill="#94A3B8" font-family="JetBrains Mono" font-size="10">CO₂ &lt; 800 ppm (Bon)</text>
+                                <circle cx="170" cy="6" r="5" fill="#F59E0B" />
+                                <text x="182" y="10" fill="#94A3B8" font-family="JetBrains Mono" font-size="10">800–1200 ppm (Moyen)</text>
+                                <circle cx="340" cy="6" r="5" fill="#EF4444" />
+                                <text x="352" y="10" fill="#94A3B8" font-family="JetBrains Mono" font-size="10">&gt; 1200 ppm (Alerte)</text>
+                            </g>
+                        </svg>
+                    </div>
+                </div>
+
+                <!-- PANNEAU DE CONTRÔLE DÉTAILLÉ DE LA ZONE SÉLECTIONNÉE (5 colonnes) -->
+                <div class="xl:col-span-5 bg-dexCard border border-dexBorder rounded-2xl p-4 sm:p-5 shadow-xl space-y-4">
+                    <div class="flex items-start justify-between gap-2 border-b border-dexBorder pb-3">
+                        <div>
+                            <span id="zone-detail-floor" class="text-[11px] font-mono font-bold uppercase text-dexCyan">NIVEAU R+2 • ZONE ACTIVE</span>
+                            <h3 id="zone-detail-name" class="text-base sm:text-lg font-extrabold text-white">Open Space Nord</h3>
+                            <p id="zone-detail-desc" class="text-xs text-slate-400">Plateau collaboratif • Vannes terminales 2 voies &amp; registres VAV</p>
+                        </div>
+                        <button type="button" onclick="simulateOccupancySpike()" class="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 text-amber-300 text-xs font-extrabold shrink-0 transition cursor-pointer">
+                            👥 Pic d'occupation
+                        </button>
+                    </div>
+
+                    <!-- Sélecteur rapide des 6 zones -->
+                    <div id="zone-pills-bar" class="grid grid-cols-3 gap-1.5">
+                        <!-- Rempli dynamiquement -->
+                    </div>
+
+                    <!-- Grille de télémétrie de la zone -->
+                    <div class="grid grid-cols-2 gap-3">
+                        <!-- Température & Consigne Locale -->
+                        <div class="p-3.5 rounded-xl bg-dexBg border border-dexBorder space-y-2">
+                            <span class="text-[10px] font-bold uppercase text-slate-400">Température vs Consigne</span>
+                            <div class="flex items-baseline justify-between">
+                                <strong id="zd-temp" class="text-xl font-mono font-extrabold text-white">21.2 °C</strong>
+                                <span id="zd-sp" class="text-xs font-mono font-bold text-dexCyan">Cons: 21.0°C</span>
+                            </div>
+                            <div class="flex items-center justify-between pt-1 border-t border-dexBorder/60">
+                                <span class="text-[11px] text-slate-400">Ajuster consigne :</span>
+                                <div class="flex items-center gap-1">
+                                    <button type="button" onclick="adjustZoneSetpoint(-0.5)" class="w-7 h-7 rounded-lg bg-dexSurface hover:bg-slate-700 text-white font-bold text-xs cursor-pointer">−</button>
+                                    <button type="button" onclick="adjustZoneSetpoint(0.5)" class="w-7 h-7 rounded-lg bg-dexSurface hover:bg-slate-700 text-white font-bold text-xs cursor-pointer">+</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Qualité d'air CO2 & Occupation -->
+                        <div class="p-3.5 rounded-xl bg-dexBg border border-dexBorder space-y-2">
+                            <div class="flex items-center justify-between">
+                                <span class="text-[10px] font-bold uppercase text-slate-400">Taux de CO₂</span>
+                                <span id="zd-co2-badge" class="px-2 py-0.5 rounded text-[10px] font-mono font-extrabold bg-emerald-500/15 text-emerald-400">BON</span>
+                            </div>
+                            <div class="flex items-baseline justify-between">
+                                <strong id="zd-co2" class="text-xl font-mono font-extrabold text-dexEmerald">680 ppm</strong>
+                                <span id="zd-occ" class="text-xs font-mono text-slate-300">18 / 25 pers.</span>
+                            </div>
+                            <div class="w-full h-2 rounded-full bg-dexSurface overflow-hidden">
+                                <div id="zd-co2-bar" class="h-full bg-dexEmerald transition-all duration-300" style="width: 42%;"></div>
+                            </div>
+                        </div>
+
+                        <!-- Ventilation (Débit & Registre) -->
+                        <div class="p-3.5 rounded-xl bg-dexBg border border-dexBorder space-y-1.5">
+                            <span class="text-[10px] font-bold uppercase text-slate-400">Ventilation / Registre VAV</span>
+                            <div class="flex items-baseline justify-between">
+                                <strong id="zd-flow" class="text-base font-mono font-extrabold text-dexCyan">920 m³/h</strong>
+                                <span id="zd-damper" class="text-xs font-mono font-bold text-slate-300">Reg: 62%</span>
+                            </div>
+                            <div id="zd-valve-state" class="text-[11px] font-mono text-slate-400">Vanne terminal : 38% (Chaud)</div>
+                        </div>
+
+                        <!-- Éclairage & Stores Solaires -->
+                        <div class="p-3.5 rounded-xl bg-dexBg border border-dexBorder space-y-1.5">
+                            <span class="text-[10px] font-bold uppercase text-slate-400">Éclairage DALI &amp; Stores</span>
+                            <div class="flex items-baseline justify-between">
+                                <strong id="zd-light" class="text-base font-mono font-extrabold text-amber-300">85 %</strong>
+                                <span id="zd-blinds" class="text-xs font-mono text-slate-300">Stores: 30%</span>
+                            </div>
+                            <div class="flex gap-1.5 pt-0.5">
+                                <button type="button" onclick="toggleZoneLightOverride()" class="flex-1 py-1 rounded-lg bg-dexSurface hover:bg-slate-700 text-[10px] font-bold text-slate-200 cursor-pointer">
+                                    Forcer Écl.
+                                </button>
+                                <button type="button" onclick="toggleZoneBlindsOverride()" class="flex-1 py-1 rounded-lg bg-dexSurface hover:bg-slate-700 text-[10px] font-bold text-slate-200 cursor-pointer">
+                                    Stores ±
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Mini-synoptique carte récapitulative de toutes les zones -->
+                    <div class="pt-1 space-y-2">
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Vue synthétique des 6 zones du bâtiment :</span>
+                        <div id="all-zones-mini-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <!-- Rempli dynamiquement -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================================================================= -->
+        <!-- VUE 2 : COURBES DE CONSOMMATION & ANALYSE ÉNERGÉTIQUE             -->
+        <!-- ================================================================= -->
+        <section id="view-energy" class="hidden space-y-5">
+
+            <!-- KPIs Énergétiques & Décret Tertiaire -->
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="bg-dexCard border border-dexBorder rounded-2xl p-4 shadow">
+                    <span class="text-[10px] font-bold uppercase text-slate-400">Puissance Électrique / CVC</span>
+                    <div class="mt-1 flex items-baseline justify-between">
+                        <strong id="en-total-kw" class="text-2xl font-mono font-extrabold text-dexOrange">34.2 kW</strong>
+                        <span id="en-net-kw" class="text-xs font-mono text-emerald-400">Réseau: 27.4 kW</span>
+                    </div>
+                </div>
+
+                <div class="bg-dexCard border border-dexBorder rounded-2xl p-4 shadow">
+                    <span class="text-[10px] font-bold uppercase text-slate-400">Coût d'Exploitation Horaire</span>
+                    <div class="mt-1 flex items-baseline justify-between">
+                        <strong id="en-cost-hour" class="text-2xl font-mono font-extrabold text-white">5.75 €/h</strong>
+                        <span id="en-tarif-ref" class="text-xs font-mono text-slate-400">0.21 €/kWh</span>
+                    </div>
+                </div>
+
+                <div class="bg-dexCard border border-dexBorder rounded-2xl p-4 shadow">
+                    <span class="text-[10px] font-bold uppercase text-slate-400">Ratio Projeté (1 200 m²)</span>
+                    <div class="mt-1 flex items-baseline justify-between">
+                        <strong id="en-kwh-m2" class="text-2xl font-mono font-extrabold text-dexCyan">88 kWh/m².an</strong>
+                        <span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-mono text-[10px] font-bold">CIBLE -40% OK</span>
+                    </div>
+                </div>
+
+                <div class="bg-dexCard border border-dexBorder rounded-2xl p-4 shadow">
+                    <span class="text-[10px] font-bold uppercase text-slate-400">Répartition Lots Instantanée</span>
+                    <div id="en-lots-summary" class="mt-1.5 text-[11px] font-mono text-slate-300 space-y-0.5">
+                        <div>Chauffage: 14.5 kW • Vent: 8.2 kW</div>
+                        <div>Clim: 0.0 kW • Écl/Aux: 11.5 kW</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2 Graphiques Dynamiques Côte à Côte -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                <!-- Graphique 1 : Consommation Globale et par Lot -->
+                <div class="bg-dexCard border border-dexBorder rounded-2xl p-4 sm:p-5 shadow-xl space-y-3">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                            <span class="text-[11px] font-mono font-bold uppercase text-dexOrange">COMPTAGE MULTI-FLUIDES &amp; LOTS</span>
+                            <h3 class="text-sm sm:text-base font-extrabold text-white">Puissance Globale &amp; Décomposition CVC / Éclairage (kW)</h3>
+                        </div>
+                        <div class="flex flex-wrap gap-2 text-[11px] font-mono">
+                            <span class="text-white font-bold">― Total</span>
+                            <span class="text-dexOrange">― Chauffage</span>
+                            <span class="text-dexCyan">― Ventilation</span>
+                            <span class="text-dexEmerald">― PV Solaire</span>
+                        </div>
+                    </div>
+                    <div class="w-full h-[320px] bg-dexBg border border-dexBorder rounded-xl p-2">
+                        <canvas id="energy-power-canvas" class="w-full h-full block"></canvas>
+                    </div>
+                </div>
+
+                <!-- Graphique 2 : Évolution Croisée T° Ext vs T° Int vs CO2 -->
+                <div class="bg-dexCard border border-dexBorder rounded-2xl p-4 sm:p-5 shadow-xl space-y-3">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                            <span class="text-[11px] font-mono font-bold uppercase text-dexCyan">CORRÉLATION CLIMATIQUE &amp; QAI</span>
+                            <h3 class="text-sm sm:text-base font-extrabold text-white">T° Extérieure vs T° Intérieure Moyenne &amp; CO₂ (ppm)</h3>
+                        </div>
+                        <div class="flex flex-wrap gap-2 text-[11px] font-mono">
+                            <span class="text-dexCyan">--- T° Ext</span>
+                            <span class="text-dexEmerald">― T° Int</span>
+                            <span class="text-amber-400">― CO₂ Moyen</span>
+                        </div>
+                    </div>
+                    <div class="w-full h-[320px] bg-dexBg border border-dexBorder rounded-xl p-2">
+                        <canvas id="climate-co2-canvas" class="w-full h-full block"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================================================================= -->
+        <!-- VUE 3 : SÉCURITÉ & SÉCURITÉ INCENDIE (SSI) & JOURNAL D'ALARMES    -->
+        <!-- ================================================================= -->
+        <section id="view-ssi" class="hidden space-y-5">
+            <div class="grid grid-cols-1 xl:grid-cols-12 gap-5 items-start">
+
+                <!-- Centrale SSI & Asservissements (6 colonnes) -->
+                <div class="xl:col-span-6 bg-dexCard border border-dexBorder rounded-2xl p-4 sm:p-5 shadow-xl space-y-4">
+                    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-dexBorder pb-3">
+                        <div>
+                            <span class="text-[11px] font-mono font-bold uppercase text-red-400">SYSTÈME DE SÉCURITÉ INCENDIE (SSI CATÉGORIE A)</span>
+                            <h2 class="text-base font-extrabold text-white">Supervision Détection, Clapets Coupe-Feu &amp; Désenfumage</h2>
+                        </div>
+                        <div class="flex gap-2">
+                            <button type="button" onclick="triggerFireAlarm()" class="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-extrabold shadow cursor-pointer">
+                                🔥 Simuler Alarme Incendie
+                            </button>
+                            <button type="button" onclick="resetFireAlarm()" class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold shadow cursor-pointer">
+                                ✓ Réarmer SSI
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- État des 4 Asservissements Critiques SSI -->
+                    <div class="grid grid-cols-2 gap-3 text-xs">
+                        <div id="ssi-box-cta" class="p-3.5 rounded-xl bg-dexBg border border-dexBorder space-y-1">
+                            <span class="text-slate-400 font-bold uppercase text-[10px]">Centrale Traitement d'Air</span>
+                            <div id="ssi-val-cta" class="font-mono font-extrabold text-sm text-emerald-400">MARCHE NORMALE</div>
+                            <span class="text-[11px] text-slate-400">Arrêt réflexe sur alarme feu</span>
+                        </div>
+                        <div id="ssi-box-ccf" class="p-3.5 rounded-xl bg-dexBg border border-dexBorder space-y-1">
+                            <span class="text-slate-400 font-bold uppercase text-[10px]">Clapets Coupe-Feu (CCF)</span>
+                            <div id="ssi-val-ccf" class="font-mono font-extrabold text-sm text-emerald-400">ARMÉS / OUVERTS</div>
+                            <span class="text-[11px] text-slate-400">Compartimentage gaines CVC</span>
+                        </div>
+                        <div id="ssi-box-desenf" class="p-3.5 rounded-xl bg-dexBg border border-dexBorder space-y-1">
+                            <span class="text-slate-400 font-bold uppercase text-[10px]">Volets &amp; Tourelles Désenfumage</span>
+                            <div id="ssi-val-desenf" class="font-mono font-extrabold text-sm text-slate-300">FERMÉS (VEILLE)</div>
+                            <span class="text-[11px] text-slate-400">Extraction fumées 100 % sur feu</span>
+                        </div>
+                        <div id="ssi-box-issues" class="p-3.5 rounded-xl bg-dexBg border border-dexBorder space-y-1">
+                            <span class="text-slate-400 font-bold uppercase text-[10px]">Contrôle d'Accès / Issues</span>
+                            <div id="ssi-val-issues" class="font-mono font-extrabold text-sm text-dexCyan">VERROUILLAGE BADGE</div>
+                            <span class="text-[11px] text-slate-400">Déverrouillage auto évacuation</span>
+                        </div>
+                    </div>
+
+                    <!-- Matrice des Détecteurs & Déclencheurs Manuels par Zone -->
+                    <div class="space-y-2">
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">État des boucles de détection par zone (Cliquez pour déclencher un test local) :</span>
+                        <div id="ssi-zones-matrix" class="space-y-2">
+                            <!-- Rempli dynamiquement -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Journal des Événements & Acquittement des Alarmes (6 colonnes) -->
+                <div class="xl:col-span-6 bg-dexCard border border-dexBorder rounded-2xl p-4 sm:p-5 shadow-xl space-y-4">
+                    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-dexBorder pb-3">
+                        <div>
+                            <span class="text-[11px] font-mono font-bold uppercase text-amber-400">HISTORIQUE &amp; TRAÇABILITÉ GTB</span>
+                            <h2 class="text-base font-extrabold text-white">Journal des Alarmes &amp; Acquittement Défauts</h2>
+                        </div>
+                        <button type="button" onclick="acknowledgeAllAlarms()" class="px-3 py-1.5 rounded-xl bg-dexCyan text-dexBg text-xs font-extrabold hover:bg-sky-300 transition cursor-pointer">
+                            ✓ Tout acquitter
+                        </button>
+                    </div>
+
+                    <div id="alarm-log-list" class="space-y-2 max-h-[460px] overflow-y-auto pr-1">
+                        <!-- Rempli dynamiquement -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================================================================= -->
+        <!-- VUE 4 : MODULE DE 10 CAS PRATIQUES (PÉDAGOGIE & DÉPANNAGE CVC/GTB) -->
+        <!-- ================================================================= -->
+        <section id="view-cases" class="hidden space-y-5">
+            <div class="bg-dexCard border border-dexBorder rounded-2xl p-4 sm:p-6 shadow-xl space-y-5">
+
+                <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-4 border-b border-dexBorder">
+                    <div>
+                        <span class="text-[11px] font-mono font-bold uppercase tracking-wider text-dexOrange">
+                            FORMATION TERRAIN DEXFORMA • DIAGNOSTIC MULTI-LOTS CVC / GTB / SSI
+                        </span>
+                        <h2 class="text-base sm:text-lg font-extrabold text-white">
+                            10 Scénarios Interactifs : Qualité d'Air, Économies d'Énergie, SSI &amp; Production CVC
+                        </h2>
+                        <p class="text-xs text-slate-400 mt-0.5">
+                            3 cas Qualité d'Air (CO₂) • 3 cas Optimisation Énergétique • 2 cas Sécurité Incendie (SSI) • 2 cas Pannes Production CVC
+                        </p>
+                    </div>
+
+                    <div class="flex items-center gap-3">
+                        <div class="px-4 py-2 rounded-xl bg-dexBg border border-dexBorder text-right">
+                            <span class="text-[10px] font-bold uppercase text-slate-400 block">Compétences Validées</span>
+                            <strong id="quiz-score-big" class="text-lg font-mono font-extrabold text-emerald-400">0 / 10</strong>
+                        </div>
+                        <button type="button" onclick="exportPdfReport()" class="px-4 py-2.5 rounded-xl bg-dexOrange hover:bg-orange-500 text-white text-xs font-extrabold shadow cursor-pointer">
+                            Exporter Bilan PDF
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Navigation 1 à 10 -->
+                <div id="cases-selector-grid" class="grid grid-cols-2 sm:grid-cols-5 lg:grid-cols-10 gap-2"></div>
+
+                <!-- Carte du cas actif -->
+                <div id="case-detail-panel" class="bg-dexBg border border-dexBorder rounded-2xl p-4 sm:p-6 space-y-4"></div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- ===================================================================== -->
+    <!-- RAPPORT D'INTERVENTION PDF IMPRIMABLE (Masqué à l'écran)              -->
+    <!-- ===================================================================== -->
+    <section id="print-pdf-report" class="hidden print-only p-8 bg-white text-slate-900 space-y-6">
+        <div class="border-b-2 border-slate-900 pb-4 flex justify-between items-start">
+            <div>
+                <div class="text-xs font-bold uppercase tracking-widest text-orange-600">DEXFORMA — SUPERVISION GTB &amp; PERFORMANCE ÉNERGÉTIQUE</div>
+                <h1 class="text-2xl font-extrabold text-slate-900 mt-1">RAPPORT D'INTERVENTION &amp; DIAGNOSTIC GTB / CVC</h1>
+                <p class="text-sm text-slate-600">Bâtiment Tertiaire 1 200 m² • Relevé des zones, bilan énergétique, SSI et validation technicien</p>
+            </div>
+            <div id="print-date-stamp" class="text-right font-mono text-xs text-slate-700"></div>
+        </div>
+        <div id="print-report-body" class="space-y-5 text-sm"></div>
+    </section>
+
+    <!-- ===================================================================== -->
+    <!-- LOGIQUE APPLICATIVE COMPLÈTE (SIMULATION MULTI-ZONES, CANVAS & QUIZ)  -->
+    <!-- ===================================================================== -->
+    <script>
+        // =====================================================================
+        // 1. MODÈLE DE DONNÉES DU BÂTIMENT TERTIAIRE (6 ZONES + CONFIGURATION)
+        // =====================================================================
+        const BUILDING_MODES = {
+            confort: {
+                label: 'Confort (Occupation)',
+                tag: 'CONFORT',
+                tempOffset: 0.0,
+                occFactor: 1.0,
+                minVentPct: 45,
+                lightPct: 85,
+                blindsAuto: true
+            },
+            nuit: {
+                label: 'Nuit / Inoccupé',
+                tag: 'RÉDUIT NUIT',
+                tempOffset: -4.5,
+                occFactor: 0.0,
+                minVentPct: 10,
+                lightPct: 0,
+                blindsAuto: false
+            },
+            weekend: {
+                label: 'Week-end / Jours fériés',
+                tag: 'ÉCO WEEK-END',
+                tempOffset: -5.0,
+                occFactor: 0.0,
+                minVentPct: 5,
+                lightPct: 0,
+                blindsAuto: false
+            },
+            derogation: {
+                label: 'Dérogation / Événement',
+                tag: 'DÉROGATION',
+                tempOffset: 0.5,
+                occFactor: 1.25,
+                minVentPct: 75,
+                lightPct: 100,
+                blindsAuto: true
+            }
+        };
+
+        const bmsState = {
+            mode: 'confort',
+            outdoorTemp: 8.0,
+            paused: false,
+            speed: 1,
+            simMinutes: 10 * 60 + 30, // 10:30
+            dayName: 'Mardi',
+
+            // Seuils configurables
+            config: {
+                co2Warn: 800,
+                co2Crit: 1200,
+                baseConfortTemp: 21.0,
+                baseNightTemp: 16.5,
+                kwhPrice: 0.21
+            },
+
+            // État SSI Incendie
+            fireAlarmActive: false,
+            fireZoneId: null,
+            ctaFault: false,
+
+            // Zone sélectionnée dans le synoptique
+            selectedZoneId: 'open_nord',
+
+            // Les 6 zones interactives du bâtiment
+            zones: [
+                {
+                    id: 'open_nord',
+                    name: 'Open Space Nord',
+                    floor: 'Niveau R+2',
+                    desc: 'Plateau collaboratif Nord • Vannes terminales 2 voies & registres VAV',
+                    maxOcc: 25,
+                    occ: 19,
+                    temp: 21.2,
+                    localOffset: 0.0,
+                    co2: 680,
+                    maxFlow: 1500,
+                    flow: 930,
+                    damperPct: 62,
+                    valvePct: 38,
+                    lightPct: 85,
+                    blindsPct: 20,
+                    southExposed: false,
+                    smokeDetector: 'OK',
+                    manualCallPoint: 'OK',
+                    fireDamper: 'OUVERT',
+                    smokeHatch: 'FERMÉ'
+                },
+                {
+                    id: 'open_sud',
+                    name: 'Open Space Sud',
+                    floor: 'Niveau R+2',
+                    desc: 'Façade vitrée Sud • Gestion apports solaires & stores BSO automatisés',
+                    maxOcc: 20,
+                    occ: 16,
+                    temp: 21.6,
+                    localOffset: 0.0,
+                    co2: 640,
+                    maxFlow: 1200,
+                    flow: 720,
+                    damperPct: 60,
+                    valvePct: 24,
+                    lightPct: 70,
+                    blindsPct: 55,
+                    southExposed: true,
+                    smokeDetector: 'OK',
+                    manualCallPoint: 'OK',
+                    fireDamper: 'OUVERT',
+                    smokeHatch: 'FERMÉ'
+                },
+                {
+                    id: 'reunion_a',
+                    name: 'Salle de Réunion A',
+                    floor: 'Niveau R+1',
+                    desc: 'Salle équipée sonde CO₂ dédiée • Boost renouvellement air neuf sur occupation',
+                    maxOcc: 12,
+                    occ: 9,
+                    temp: 21.1,
+                    localOffset: 0.0,
+                    co2: 760,
+                    maxFlow: 900,
+                    flow: 630,
+                    damperPct: 70,
+                    valvePct: 30,
+                    lightPct: 90,
+                    blindsPct: 35,
+                    southExposed: false,
+                    smokeDetector: 'OK',
+                    manualCallPoint: 'OK',
+                    fireDamper: 'OUVERT',
+                    smokeHatch: 'FERMÉ'
+                },
+                {
+                    id: 'reunion_b',
+                    name: 'Salle de Réunion B',
+                    floor: 'Niveau R+1',
+                    desc: 'Salle de visioconférence • Régulation VAV rapide sur détection présence',
+                    maxOcc: 15,
+                    occ: 4,
+                    temp: 20.9,
+                    localOffset: 0.0,
+                    co2: 560,
+                    maxFlow: 1100,
+                    flow: 495,
+                    damperPct: 45,
+                    valvePct: 35,
+                    lightPct: 80,
+                    blindsPct: 40,
+                    southExposed: true,
+                    smokeDetector: 'OK',
+                    manualCallPoint: 'OK',
+                    fireDamper: 'OUVERT',
+                    smokeHatch: 'FERMÉ'
+                },
+                {
+                    id: 'direction',
+                    name: 'Bureaux Direction',
+                    floor: 'Niveau RDC',
+                    desc: 'Bureaux cloisonnés • Ajustement individuel de consigne ±3°C sur thermostat KNX',
+                    maxOcc: 6,
+                    occ: 4,
+                    temp: 21.4,
+                    localOffset: 0.5,
+                    co2: 520,
+                    maxFlow: 450,
+                    flow: 225,
+                    damperPct: 50,
+                    valvePct: 42,
+                    lightPct: 85,
+                    blindsPct: 25,
+                    southExposed: false,
+                    smokeDetector: 'OK',
+                    manualCallPoint: 'OK',
+                    fireDamper: 'OUVERT',
+                    smokeHatch: 'FERMÉ'
+                },
+                {
+                    id: 'hall',
+                    name: 'Hall & Sanitaires',
+                    floor: 'Niveau RDC',
+                    desc: 'Accueil & locaux sanitaires • Extraction dédiée & éclairage sur détection',
+                    maxOcc: 10,
+                    occ: 3,
+                    temp: 20.1,
+                    localOffset: -1.0,
+                    co2: 490,
+                    maxFlow: 600,
+                    flow: 330,
+                    damperPct: 55,
+                    valvePct: 30,
+                    lightPct: 75,
+                    blindsPct: 0,
+                    southExposed: false,
+                    smokeDetector: 'OK',
+                    manualCallPoint: 'OK',
+                    fireDamper: 'OUVERT',
+                    smokeHatch: 'FERMÉ'
+                }
+            ],
+
+            // Puissances instantanées par lot (kW)
+            power: {
+                heating: 14.5,
+                ventilation: 8.2,
+                cooling: 0.0,
+                lightingAux: 11.5,
+                solarPv: 6.8,
+                totalGross: 34.2,
+                totalNet: 27.4
+            },
+
+            // Historique courbes (60 points)
+            history: [],
+
+            // Journal d'alarmes
+            alarms: [
+                {
+                    id: 101,
+                    time: '08:15',
+                    type: 'INFO',
+                    zone: 'Centrale CTA',
+                    msg: 'Relance matinale optimale effectuée — Atteinte consigne Confort à 08:25.',
+                    ack: true
+                },
+                {
+                    id: 102,
+                    time: '09:42',
+                    type: 'WARN',
+                    zone: 'Salle de Réunion A',
+                    msg: 'Pré-alarme CO₂ franchie (845 ppm) — Ouverture registre VAV à 85 %.',
+                    ack: true
+                }
+            ],
+
+            // Module 10 cas pratiques
+            activeTab: 'synoptic',
+            currentCaseIdx: 0,
+            caseAnswers: {}
+        };
+
+        // =====================================================================
+        // 2. BASE DES 10 CAS PRATIQUES (PÉDAGOGIE & DÉPANNAGE CVC/GTB)
+        // =====================================================================
+        const BMS_PRACTICAL_CASES = [
+            // --- 3 CAS QUALITÉ D'AIR INTÉRIEUR (QAI / CO2) ---
+            {
+                id: 1,
+                category: "Qualité d'Air Intérieur (CO₂)",
+                badgeClass: "bg-sky-500/15 text-sky-400 border-sky-500/30",
+                title: "Cas #1 — Pic critique de CO₂ (1 650 ppm) en Salle de Réunion A",
+                context: "Une réunion imprévue réunit 15 personnes dans la Salle de Réunion A (prévue pour 12). Le taux de CO₂ grimpe à 1 650 ppm (alarme rouge), malgré un registre VAV déjà ouvert à 100 %.",
+                symptom: "Zone : Salle de Réunion A • CO₂ > 1 200 ppm • Registre VAV local = 100 %, mais débit mesuré plafonnant à 420 m³/h au lieu de 900 m³/h.",
+                question: "Quel diagnostic terrain explique ce manque de débit d'air neuf alors que le registre local est grand ouvert ?",
+                options: [
+                    "La pression statique en gaine de soufflage de la CTA est insuffisante (variateur CTA bridé ou encrassement des filtres CTA) : le registre local est à 100 % mais manque de pression amont",
+                    "La vanne 2 voies de chauffage est fermée",
+                    "Les stores solaires sont trop baissés"
+                ],
+                correct: 0,
+                explanation: "Un registre VAV ouvert à 100 % ne peut délivrer son débit nominal que si la CTA maintient la pression de consigne dans le réseau aéraulique (ou si les filtres ne sont pas colmatés).",
+                simAction: () => {
+                    selectZone('reunion_a');
+                    const z = getZone('reunion_a');
+                    z.occ = 15;
+                    z.co2 = 1650;
+                    z.damperPct = 100;
+                    z.flow = 420;
+                    addAlarm('CRIT', z.name, 'Pic critique CO₂ (1 650 ppm) — Débit air neuf insuffisant malgré registre 100%.');
+                }
+            },
+            {
+                id: 2,
+                category: "Qualité d'Air Intérieur (CO₂)",
+                badgeClass: "bg-sky-500/15 text-sky-400 border-sky-500/30",
+                title: "Cas #2 — Sonde CO₂ décalée affichant 1 150 ppm en pleine nuit",
+                context: "À 03h00 du matin, alors que le bâtiment est totalement vide (mode Nuit), l'Open Space Nord affiche en permanence 1 150 ppm de CO₂, maintenant la ventilation à 75 % toute la nuit.",
+                symptom: "Mode Nuit • Occupation = 0 pers. • CO₂ Open Space Nord bloqué à 1 150 ppm • Surconsommation ventilation nocturne.",
+                question: "Quelle est la cause probable et l'action corrective à mener sur la sonde ?",
+                options: [
+                    "Dérive du zéro de la cellule NDIR de la sonde CO₂ (auto-calibration ABC désactivée ou défectueuse) : contrôler avec un analyseur portable et réétalonner à 420 ppm (air extérieur)",
+                    "Les plantes vertes de l'open space rejettent trop de CO₂",
+                    "Il faut passer le bâtiment en mode Dérogation"
+                ],
+                correct: 0,
+                explanation: "Une sonde NDIR sans auto-calibration (ABC) ou exposée à un encrassement dérive vers le haut. L'air extérieur neuf contient environ 410–430 ppm de CO₂ : toute valeur > 500 ppm après plusieurs heures d'inoccupation signale un défaut d'étalonnage.",
+                simAction: () => {
+                    setBuildingMode('nuit');
+                    selectZone('open_nord');
+                    const z = getZone('open_nord');
+                    z.co2 = 1150;
+                    z.damperPct = 75;
+                    addAlarm('WARN', z.name, 'Dérive capteur CO₂ suspectée (1 150 ppm en période d’inoccupation Nuit).');
+                }
+            },
+            {
+                id: 3,
+                category: "Qualité d'Air Intérieur (CO₂)",
+                badgeClass: "bg-sky-500/15 text-sky-400 border-sky-500/30",
+                title: "Cas #3 — Registre motorisé VAV bloqué mécaniquement en position fermée",
+                context: "Dans la Salle de Réunion B, la supervision GTB indique une commande registre à 95 %, mais le CO₂ continue d'augmenter linéairement et aucun souffle d'air n'est perceptible aux diffuseurs.",
+                symptom: "Commande GTB registre = 95 % • CO₂ en hausse constante (1 340 ppm) • Débit réel mesuré = 0 m³/h.",
+                question: "Comment confirmer et résoudre cette panne terrain ?",
+                options: [
+                    "Désaccouplement de l'axe entre le servomoteur et le volet du registre (vis de serrage desserrée) ou coupure d'alimentation 24V du servomoteur : intervenir sur le plénum en faux-plafond",
+                    "Augmenter le seuil d'alarme CO₂ à 2 500 ppm",
+                    "Baisser la consigne de température à 17 °C"
+                ],
+                correct: 0,
+                explanation: "En GTB, la valeur affichée (95 %) est souvent la consigne envoyée (signal 0–10 V) et non une recopie de position réelle. Si le servomoteur patine sur l'axe du registre, le volet reste fermé.",
+                simAction: () => {
+                    setBuildingMode('confort');
+                    selectZone('reunion_b');
+                    const z = getZone('reunion_b');
+                    z.occ = 14;
+                    z.co2 = 1340;
+                    z.damperPct = 95;
+                    z.flow = 0;
+                    addAlarm('CRIT', z.name, 'Discordance débit air / commande registre VAV (95%) — CO₂ = 1 340 ppm.');
+                }
+            },
+
+            // --- 3 CAS OPTIMISATION ÉNERGÉTIQUE ---
+            {
+                id: 4,
+                category: "Optimisation Énergétique",
+                badgeClass: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
+                title: "Cas #4 — Dérive des consignes manuelles sur les thermostats de zone",
+                context: "Lors d'un audit énergétique mensuel, vous constatez que la consommation de chauffage a bondi de +22 % en hiver alors que la température extérieure est clémente (10 °C).",
+                symptom: "Bureaux Direction & Open Space Sud réglés manuellement à 24,5 °C par les occupants • Rappel : +1 °C = +7 % de consommation.",
+                question: "Quelle stratégie GTB conforme au Décret BACS permet d'éviter cette dérive tout en laissant du confort ?",
+                options: [
+                    "Brider la plage de dérogation locale à ±1,5 °C autour de la consigne centrale (ex: 20,5 °C ± 1,5 °C) et programmer un retour automatique à la consigne de base toutes les 2 heures",
+                    "Supprimer tous les thermostats et couper le chauffage",
+                    "Laisser la consigne à 25 °C toute l'année"
+                ],
+                correct: 0,
+                explanation: "Le bridage logiciel des dérogations locales (±1,5 °C max) avec réinitialisation horaire automatique est une exigence clé de la norme EN ISO 52120 (classe A/B Décret BACS).",
+                simAction: () => {
+                    setBuildingMode('confort');
+                    getZone('direction').localOffset = 3.5;
+                    getZone('open_sud').localOffset = 3.0;
+                    selectZone('direction');
+                    addAlarm('WARN', 'Bureaux Direction', 'Dérive énergétique : consigne locale relevée à 24.5 °C (+3.5°C).');
+                }
+            },
+            {
+                id: 5,
+                category: "Optimisation Énergétique",
+                badgeClass: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
+                title: "Cas #5 — Simultaneité Chaud / Froid et apports solaires en mi-saison",
+                context: "En avril (T° ext = 16 °C, grand soleil), l'Open Space Sud est en demande de climatisation (24,2 °C) tandis que les stores extérieurs BSO sont restés relevés à 0 %.",
+                symptom: "Open Space Sud : T° = 24,2 °C • Climatisation active (11 kW) • Stores solaires ouverts à 0 % en plein ensoleillement.",
+                question: "Quelle séquence d'automatisme multi-lots (CVC + Stores) permet d'économiser jusqu'à 30 % de froid ?",
+                options: [
+                    "Asservissement solaire : abaisser automatiquement les stores BSO à 75 % dès que l'ensoleillement dépasse le seuil en période d'occupation/inoccupation, avant d'enclencher la production froid",
+                    "Ouvrir la vanne d'eau chaude en même temps pour équilibrer",
+                    "Couper la ventilation de l'Open Space Sud"
+                ],
+                correct: 0,
+                explanation: "Le pilotage coordonné Stores + CVC (protection solaire passive prioritaire) bloque le rayonnement infrarouge avant qu'il ne traverse le vitrage, évitant l'enclenchement inutile des groupes froids.",
+                simAction: () => {
+                    updateOutdoorTemp(18.0);
+                    document.getElementById('slider-ext-temp').value = 18.0;
+                    selectZone('open_sud');
+                    const z = getZone('open_sud');
+                    z.temp = 24.2;
+                    z.blindsPct = 0;
+                    addAlarm('WARN', z.name, 'Surchauffe solaire (24.2 °C) : stores BSO relevés (0%) en plein ensoleillement.');
+                }
+            },
+            {
+                id: 6,
+                category: "Optimisation Énergétique",
+                badgeClass: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
+                title: "Cas #6 — Programmation horaire et relance matinale inadaptées",
+                context: "L'analyse des courbes de puissance montre des appels de 55 kW dès 04h00 du matin et un maintien en mode Confort jusqu'à 22h00, alors que les bureaux sont occupés de 08h30 à 18h30.",
+                symptom: "Talon de puissance élevé de 18h30 à 22h00 et le week-end • Absence d'optimiseur d'intermittence.",
+                question: "Comment optimiser le planning GTB sans dégrader le confort à 08h30 ?",
+                options: [
+                    "Caler l'horaire d'occupation de 08h30 à 18h00 avec anticipation d'arrêt (-30 min grâce à l'inertie) et activer l'optimiseur de relance auto-adaptatif en fonction de la T° extérieure",
+                    "Passer le bâtiment en mode Confort permanent 24h/24",
+                    "Abaisser la consigne de nuit à 5 °C au risque de gel"
+                ],
+                correct: 0,
+                explanation: "Un optimiseur de relance calcule chaque matin l'heure exacte de démarrage du chauffage selon l'écart entre T° intérieure et T° extérieure (ex: démarrage à 07h15 par 5 °C ext au lieu de 04h00 fixe).",
+                simAction: () => {
+                    setBuildingMode('derogation');
+                    bmsState.simMinutes = 20 * 60 + 15; // 20:15
+                    addAlarm('WARN', 'Planning GTB', 'Bâtiment toujours en mode Dérogation/Confort à 20h15 en l’absence d’occupants.');
+                }
+            },
+
+            // --- 2 CAS SÉCURITÉ INCENDIE (SSI) ---
+            {
+                id: 7,
+                category: "Sécurité Incendie (SSI)",
+                badgeClass: "bg-red-500/15 text-red-400 border-red-500/30",
+                title: "Cas #7 — Déclenchement d'un détecteur optique : levée de doute & asservissements",
+                context: "Un détecteur optique de fumée passe en alarme dans l'Open Space Nord suite à des travaux de perçage générant de la poussière. Le SSI bascule en alarme feu.",
+                symptom: "Alarme Feu SSI : Open Space Nord • CTA coupée • Clapets Coupe-Feu fermés • Désenfumage ouvert à 100 %.",
+                question: "Quelle est la procédure réglementaire stricte avant tout réarmement du SSI ?",
+                options: [
+                    "Effectuer une levée de doute physique immédiate sur site dans la zone concernée pour confirmer l'absence totale de départ de feu/fumée, puis acquitter et réarmer le SSI",
+                    "Réarmer immédiatement à distance depuis la GTB sans se déplacer",
+                    "Shunter définitivement le détecteur optique de la zone"
+                ],
+                correct: 0,
+                explanation: "Règle absolue de sécurité incendie : on ne réarme jamais un SSI à l'aveugle. La levée de doute physique dans le local en alarme est obligatoire avant tout réarmement.",
+                simAction: () => {
+                    triggerFireAlarm('open_nord');
+                }
+            },
+            {
+                id: 8,
+                category: "Sécurité Incendie (SSI)",
+                badgeClass: "bg-red-500/15 text-red-400 border-red-500/30",
+                title: "Cas #8 — Clapet coupe-feu resté fermé après un essai périodique SSI",
+                context: "Le lendemain d'un essai trimestriel du SSI, les occupants de l'Open Space Nord se plaignent d'une sensation d'étouffement et de froid, alors que la CTA tourne normalement.",
+                symptom: "CTA en marche • Registre VAV Open Space Nord ouvert à 100 %, mais aucun débit d'air dans la zone • Défaut position fin de course CCF.",
+                question: "Pourquoi l'air n'arrive-t-il plus dans l'Open Space Nord après le test SSI ?",
+                options: [
+                    "Le clapet coupe-feu (CCF) de la gaine dessert de la zone n'a pas été réarmé (bobine de réarmement 24/48V ou réarmement mécanique manuel) après sa fermeture réflexe",
+                    "La sonde de CO₂ empêche l'air de passer",
+                    "Le tarif kWh est trop élevé"
+                ],
+                correct: 0,
+                explanation: "Lors d'une mise en sécurité incendie, les clapets coupe-feu (DAS) se ferment par ressort. Certains modèles anciens nécessitent un réarmement manuel sur site, et les modèles télécommandés exigent une impulsion de réarmement dédiée depuis le CMSI.",
+                simAction: () => {
+                    selectZone('open_nord');
+                    const z = getZone('open_nord');
+                    z.fireDamper = 'FERMÉ (DÉFAUT)';
+                    z.flow = 0;
+                    z.co2 = 1280;
+                    addAlarm('CRIT', z.name, 'Défaut position Clapet Coupe-Feu (CCF resté fermé après essai SSI) — Débit nul.');
+                }
+            },
+
+            // --- 2 CAS PANNES DE PRODUCTION CVC ---
+            {
+                id: 9,
+                category: "Pannes Production CVC",
+                badgeClass: "bg-amber-500/15 text-amber-400 border-amber-500/30",
+                title: "Cas #9 — Défaut du train de vannes 3 voies Chaud / Froid",
+                context: "En plein mois de janvier (T° ext = 2 °C), la température de soufflage de la CTA chute à 11 °C alors que la consigne de chauffage est à 21 °C.",
+                symptom: "T° ext = 2 °C • Demande chaud PID = 100 % • T° soufflage CTA = 11 °C • Consommation groupe froid anormalement active.",
+                question: "Quelle défaillance du train de vannes explique ce refroidissement en plein hiver ?",
+                options: [
+                    "La vanne 3 voies de la batterie eau glacée est bloquée mécaniquement ouverte (ou signal 0–10 V inversé), refroidissant l'air neuf en même temps que la batterie chaude tente de chauffer",
+                    "Les stores solaires sont fermés",
+                    "Le mode Week-end est activé"
+                ],
+                correct: 0,
+                explanation: "Sur une CTA à batteries chaude et froide en série, le blocage mécanique en ouverture de la vanne froide (ou le desserrage de l'accouplement servomoteur) provoque une lutte thermique coûteuse et chute la T° de soufflage.",
+                simAction: () => {
+                    updateOutdoorTemp(2.0);
+                    document.getElementById('slider-ext-temp').value = 2.0;
+                    bmsState.power.cooling = 18.5;
+                    addAlarm('CRIT', 'Production CVC / CTA', 'Anomalie train de vannes : simultanéité froid (18.5 kW) par 2 °C extérieur.');
+                }
+            },
+            {
+                id: 10,
+                category: "Pannes Production CVC",
+                badgeClass: "bg-amber-500/15 text-amber-400 border-amber-500/30",
+                title: "Cas #10 — Perte de débit hydraulique sur le circuit primaire chauffage",
+                context: "Toutes les zones du bâtiment perdent progressivement 2,5 °C en matinée. Les vannes terminales sont toutes ouvertes à 100 %, mais les corps de chauffe restent tièdes.",
+                symptom: "Vannes terminales = 100 % sur les 6 zones • Écart ΔT départ/retour chaudière nul • Pressostat différentiel pompe primaire en défaut.",
+                question: "Quel organe de production est en défaut et comment le vérifier sur la GTB ?",
+                options: [
+                    "Arrêt ou disjonction de la pompe double de circulation primaire (défaut variateur / manque ΔP hydraulique) : basculer sur la pompe de secours et acquitter le défaut variateur",
+                    "Les détecteurs de fumée ont coupé les vannes",
+                    "Les capteurs CO₂ sont en alarme"
+                ],
+                correct: 0,
+                explanation: "Lorsque toutes les vannes d'un bâtiment ouvrent à 100 % simultanément sans élévation de température, la panne est centralisée en chaufferie/sous-station : perte de débit primaire (pompe en défaut, filtre à tamis colmaté ou vanne d'isolement fermée).",
+                simAction: () => {
+                    bmsState.zones.forEach(z => { z.valvePct = 100; z.temp -= 2.2; });
+                    bmsState.ctaFault = true;
+                    addAlarm('CRIT', 'Chaufferie Primaire', 'Défaut pressostat ΔP pompe primaire chauffage — Perte de circulation hydraulique.');
+                }
+            }
+        ];
+
+        // =====================================================================
+        // 3. FONCTIONS UTILITAIRES & GESTION D'ÉTAT
+        // =====================================================================
+        function getZone(id) {
+            return bmsState.zones.find(z => z.id === id) || bmsState.zones[0];
+        }
+
+        function getZoneTargetTemp(zone) {
+            const modeCfg = BUILDING_MODES[bmsState.mode];
+            const base = (bmsState.mode === 'nuit' || bmsState.mode === 'weekend')
+                ? bmsState.config.baseNightTemp
+                : bmsState.config.baseConfortTemp;
+            return Number((base + zone.localOffset).toFixed(1));
+        }
+
+        function setBuildingMode(modeKey) {
+            bmsState.mode = modeKey;
+            const modeCfg = BUILDING_MODES[modeKey];
+
+            ['confort', 'nuit', 'weekend', 'derogation'].forEach(m => {
+                const btn = document.getElementById(`mode-btn-${m}`);
+                if (!btn) return;
+                if (m === modeKey) {
+                    btn.className = "px-3 py-1.5 rounded-xl border text-xs font-extrabold transition cursor-pointer bg-dexCyan/15 border-dexCyan text-dexCyan shadow";
+                } else {
+                    btn.className = "px-3 py-1.5 rounded-xl border text-xs font-bold transition cursor-pointer bg-dexSurface border-dexBorder text-slate-300 hover:text-white";
+                }
+            });
+
+            // Ajustement immédiat de l'occupation, éclairage et stores selon le mode
+            bmsState.zones.forEach(z => {
+                z.occ = Math.min(z.maxOcc, Math.round(z.maxOcc * 0.72 * modeCfg.occFactor));
+                z.lightPct = modeCfg.lightPct;
+                if (!modeCfg.blindsAuto) {
+                    z.blindsPct = (modeKey === 'nuit') ? 90 : 50; // Fermeture nocturne isolante
+                } else {
+                    z.blindsPct = z.southExposed && bmsState.outdoorTemp > 16 ? 70 : 25;
+                }
+            });
+
+            addAlarm('INFO', 'Exploitation GTB', `Basculement global du bâtiment en mode "${modeCfg.label}".`);
+            showToast(`Mode bâtiment : ${modeCfg.label}`);
+            refreshAllUI();
+        }
+
+        function updateOutdoorTemp(val) {
+            bmsState.outdoorTemp = parseFloat(val);
+            document.getElementById('ext-temp-display').textContent = `${bmsState.outdoorTemp.toFixed(1)} °C`;
+            refreshAllUI();
+        }
+
+        function toggleSimPause() {
+            bmsState.paused = !bmsState.paused;
+            const btn = document.getElementById('btn-sim-pause');
+            btn.textContent = bmsState.paused ? '▶ Reprendre' : '⏸ Pause';
+            btn.className = bmsState.paused
+                ? 'px-2.5 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-extrabold cursor-pointer'
+                : 'px-2.5 py-1.5 rounded-xl bg-dexSurface hover:bg-slate-700 border border-dexBorder text-xs font-bold text-white cursor-pointer';
+        }
+
+        function setSimSpeed(spd) {
+            bmsState.speed = spd;
+            [1, 5].forEach(s => {
+                const btn = document.getElementById(`speed-${s}`);
+                btn.className = s === spd
+                    ? 'px-2 py-1 rounded-lg text-[10px] font-mono font-bold bg-dexCyan text-dexBg cursor-pointer'
+                    : 'px-2 py-1 rounded-lg text-[10px] font-mono font-bold text-slate-400 hover:text-white cursor-pointer';
+            });
+        }
+
+        function selectZone(zoneId) {
+            bmsState.selectedZoneId = zoneId;
+            refreshAllUI();
+        }
+
+        function adjustZoneSetpoint(delta) {
+            const z = getZone(bmsState.selectedZoneId);
+            z.localOffset = Math.max(-3.0, Math.min(3.5, Number((z.localOffset + delta).toFixed(1))));
+            showToast(`Consigne ${z.name} ajustée à ${getZoneTargetTemp(z).toFixed(1)} °C`);
+            refreshAllUI();
+        }
+
+        function simulateOccupancySpike() {
+            const z = getZone(bmsState.selectedZoneId);
+            z.occ = Math.round(z.maxOcc * 1.25);
+            z.co2 = Math.min(1850, z.co2 + 480);
+            z.temp = Number((z.temp + 0.8).toFixed(1));
+            addAlarm('WARN', z.name, `Sur-occupation détectée (${z.occ}/${z.maxOcc} pers.) — Boost ventilation CO₂ enclenché.`);
+            showToast(`Pic d'occupation simulé dans ${z.name} !`, 'warn');
+            refreshAllUI();
+        }
+
+        function toggleZoneLightOverride() {
+            const z = getZone(bmsState.selectedZoneId);
+            z.lightPct = z.lightPct > 0 ? 0 : 100;
+            showToast(`Éclairage ${z.name} forcé à ${z.lightPct} %`);
+            refreshAllUI();
+        }
+
+        function toggleZoneBlindsOverride() {
+            const z = getZone(bmsState.selectedZoneId);
+            z.blindsPct = (z.blindsPct + 25) % 125;
+            showToast(`Stores solaires ${z.name} positionnés à ${z.blindsPct} %`);
+            refreshAllUI();
+        }
+
+        // =====================================================================
+        // 4. GESTION SÉCURITÉ INCENDIE (SSI) & JOURNAL D'ALARMES
+        // =====================================================================
+        function triggerFireAlarm(forcedZoneId = null) {
+            const targetZone = forcedZoneId
+                ? getZone(forcedZoneId)
+                : bmsState.zones[Math.floor(Math.random() * bmsState.zones.length)];
+
+            bmsState.fireAlarmActive = true;
+            bmsState.fireZoneId = targetZone.id;
+
+            // Mise en sécurité réglementaire SSI sur toutes les zones
+            bmsState.zones.forEach(z => {
+                z.smokeDetector = (z.id === targetZone.id) ? 'ALARME FEU' : 'VEILLE';
+                z.fireDamper = 'FERMÉ (SÉCURITÉ)';
+                z.smokeHatch = (z.id === targetZone.id) ? 'OUVERT 100%' : 'FERMÉ';
+                z.flow = 0;
+                z.damperPct = 0;
+            });
+
+            document.getElementById('ssi-emergency-banner').classList.remove('hidden');
+            document.getElementById('ssi-banner-zone').textContent = targetZone.name.toUpperCase();
+
+            addAlarm('FIRE', targetZone.name, `ALARME INCENDIE SSI DÉCLENCHÉE — Arrêt CTA, fermeture CCF et ouverture désenfumage ${targetZone.name}.`);
+            showToast(`ALARME INCENDIE SSI : ${targetZone.name} !`, 'error');
+            refreshAllUI();
+        }
+
+        function resetFireAlarm() {
+            bmsState.fireAlarmActive = false;
+            bmsState.fireZoneId = null;
+            bmsState.ctaFault = false;
+
+            bmsState.zones.forEach(z => {
+                z.smokeDetector = 'OK';
+                z.manualCallPoint = 'OK';
+                z.fireDamper = 'OUVERT';
+                z.smokeHatch = 'FERMÉ';
+            });
+
+            document.getElementById('ssi-emergency-banner').classList.add('hidden');
+            addAlarm('INFO', 'Centrale SSI', 'Levée de doute validée — Réarmement SSI, réouverture CCF et redémarrage CTA.');
+            showToast('SSI réarmé : installations CVC remises en service.', 'success');
+            refreshAllUI();
+        }
+
+        function addAlarm(type, zone, msg) {
+            const hh = String(Math.floor(bmsState.simMinutes / 60) % 24).padStart(2, '0');
+            const mm = String(Math.floor(bmsState.simMinutes % 60)).padStart(2, '0');
+            bmsState.alarms.unshift({
+                id: Date.now() + Math.random(),
+                time: `${hh}:${mm}`,
+                type,
+                zone,
+                msg,
+                ack: type === 'INFO'
+            });
+            if (bmsState.alarms.length > 35) bmsState.alarms.pop();
+        }
+
+        function acknowledgeAlarm(id) {
+            const al = bmsState.alarms.find(a => a.id === id);
+            if (al) {
+                al.ack = true;
+                showToast('Alarme acquittée par l’opérateur.');
+                refreshAllUI();
+            }
+        }
+
+        function acknowledgeAllAlarms() {
+            bmsState.alarms.forEach(a => a.ack = true);
+            showToast('Toutes les alarmes du journal ont été acquittées.');
+            refreshAllUI();
+        }
+
+        // =====================================================================
+        // 5. SIMULATION THERMIQUE, AÉRAULIQUE (CO2) & ÉNERGÉTIQUE TEMPS RÉEL
+        // =====================================================================
+        function stepBuildingSimulation() {
+            bmsState.simMinutes += 1; // +1 minute simulée par tick
+
+            let totalFlow = 0;
+            let totalHeatDemand = 0;
+            let totalCoolDemand = 0;
+            let totalLightKw = 0;
+
+            bmsState.zones.forEach(z => {
+                const targetT = getZoneTargetTemp(z);
+                const tDiff = targetT - z.temp;
+
+                // 1. Évolution CO2 selon occupation & débit air neuf
+                const co2Generation = z.occ * 26; // Apport humain ppm/min
+                const ventRatio = bmsState.fireAlarmActive ? 0 : (z.flow / Math.max(1, z.maxFlow));
+                const co2Removal = (z.co2 - 420) * (0.04 + 0.24 * ventRatio);
+                z.co2 = Math.max(415, Math.min(2200, Math.round(z.co2 + (co2Generation - co2Removal) * 0.25)));
+
+                // Alarme auto si CO2 franchit le seuil critique configuré
+                if (z.co2 >= bmsState.config.co2Crit && !z._critNotified) {
+                    z._critNotified = true;
+                    addAlarm('CRIT', z.name, `Seuil critique CO₂ dépassé (${z.co2} ppm > ${bmsState.config.co2Crit} ppm) — Ventilation forcée.`);
+                } else if (z.co2 < bmsState.config.co2Warn) {
+                    z._critNotified = false;
+                }
+
+                // 2. Régulation VAV ventilation (proportionnelle au CO2 et au mode bâtiment)
+                if (!bmsState.fireAlarmActive && !bmsState.ctaFault) {
+                    const modeMin = BUILDING_MODES[bmsState.mode].minVentPct;
+                    const co2DemandPct = Math.max(0, Math.min(100, ((z.co2 - 480) / (bmsState.config.co2Crit - 480)) * 100));
+                    const targetDamper = Math.round(Math.max(modeMin, co2DemandPct));
+                    z.damperPct += Math.sign(targetDamper - z.damperPct) * Math.min(8, Math.abs(targetDamper - z.damperPct));
+                    z.flow = Math.round((z.damperPct / 100) * z.maxFlow);
+                } else if (bmsState.fireAlarmActive) {
+                    z.damperPct = 0;
+                    z.flow = 0;
+                }
+                totalFlow += z.flow;
+
+                // 3. Régulation Thermique (Vannes terminales Chaud/Froid + inertie)
+                const solarGain = (z.southExposed && bmsState.outdoorTemp > 14)
+                    ? (0.06 * (1 - z.blindsPct / 100))
+                    : 0;
+                const occHeatGain = z.occ * 0.008;
+                const envelopeLoss = (bmsState.outdoorTemp - z.temp) * 0.015;
+
+                if (!bmsState.fireAlarmActive) {
+                    if (tDiff > 0.1) {
+                        z.valvePct = Math.min(100, Math.round(tDiff * 42));
+                        z.temp += (z.valvePct / 100) * 0.14 + envelopeLoss + occHeatGain + solarGain;
+                        totalHeatDemand += (z.valvePct / 100) * 4.8;
+                    } else if (tDiff < -0.25) {
+                        z.valvePct = Math.min(100, Math.round(Math.abs(tDiff) * 40));
+                        z.temp -= (z.valvePct / 100) * 0.14 - envelopeLoss - occHeatGain - solarGain;
+                        totalCoolDemand += (z.valvePct / 100) * 4.2;
+                    } else {
+                        z.valvePct = Math.max(0, Math.round(z.valvePct * 0.85));
+                        z.temp += envelopeLoss + occHeatGain + solarGain;
+                    }
+                } else {
+                    z.valvePct = 0;
+                    z.temp += envelopeLoss;
+                }
+                z.temp = Number(z.temp.toFixed(1));
+
+                // 4. Éclairage DALI (1.8 kW max par zone)
+                totalLightKw += (z.lightPct / 100) * 1.8;
+            });
+
+            // Bilan des puissances par lot
+            const ventKw = bmsState.fireAlarmActive ? 2.4 : Number(((totalFlow / 5750) * 11.5).toFixed(1));
+            const heatKw = Number(totalHeatDemand.toFixed(1));
+            const coolKw = Number(totalCoolDemand.toFixed(1));
+            const auxKw = Number((totalLightKw + 3.2).toFixed(1)); // Éclairage + serveurs/auxiliaires
+
+            // Production solaire PV selon ensoleillement (T° ext & heure)
+            const hour = (bmsState.simMinutes / 60) % 24;
+            const sunCurve = (hour >= 8 && hour <= 18) ? Math.sin(((hour - 8) / 10) * Math.PI) : 0;
+            const solarKw = Number((sunCurve * (bmsState.outdoorTemp > 5 ? 9.5 : 5.2)).toFixed(1));
+
+            const gross = Number((heatKw + ventKw + coolKw + auxKw).toFixed(1));
+            const net = Number(Math.max(0, gross - solarKw).toFixed(1));
+
+            bmsState.power = {
+                heating: heatKw,
+                ventilation: ventKw,
+                cooling: coolKw,
+                lightingAux: auxKw,
+                solarPv: solarKw,
+                totalGross: gross,
+                totalNet: net
+            };
+
+            // Enregistrement historique courbes
+            const avgTemp = bmsState.zones.reduce((acc, z) => acc + z.temp, 0) / bmsState.zones.length;
+            const avgCo2 = bmsState.zones.reduce((acc, z) => acc + z.co2, 0) / bmsState.zones.length;
+            const hh = String(Math.floor(bmsState.simMinutes / 60) % 24).padStart(2, '0');
+            const mm = String(Math.floor(bmsState.simMinutes % 60)).padStart(2, '0');
+
+            bmsState.history.push({
+                label: `${hh}:${mm}`,
+                total: gross,
+                heat: heatKw,
+                vent: ventKw,
+                solar: solarKw,
+                extTemp: bmsState.outdoorTemp,
+                intTemp: Number(avgTemp.toFixed(1)),
+                co2: Math.round(avgCo2)
+            });
+            if (bmsState.history.length > 60) bmsState.history.shift();
+        }
+
+        // =====================================================================
+        // 6. MISE À JOUR COMPLÈTE DE L'INTERFACE & DES SYNOPTIQUES
+        // =====================================================================
+        function getCo2ColorMeta(ppm) {
+            if (ppm >= bmsState.config.co2Crit) {
+                return { text: 'text-red-400', hex: '#EF4444', bgBar: 'bg-red-500', badge: 'CRITIQUE', badgeCls: 'bg-red-500/20 text-red-300 border border-red-500/40' };
+            }
+            if (ppm >= bmsState.config.co2Warn) {
+                return { text: 'text-amber-400', hex: '#F59E0B', bgBar: 'bg-amber-500', badge: 'ÉLEVÉ', badgeCls: 'bg-amber-500/20 text-amber-300 border border-amber-500/40' };
+            }
+            return { text: 'text-dexEmerald', hex: '#10B981', bgBar: 'bg-dexEmerald', badge: 'BON', badgeCls: 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' };
+        }
+
+        function refreshAllUI() {
+            // Horloge
+            const hh = String(Math.floor(bmsState.simMinutes / 60) % 24).padStart(2, '0');
+            const mm = String(Math.floor(bmsState.simMinutes % 60)).padStart(2, '0');
+            document.getElementById('sim-clock-display').textContent = `${hh}:${mm}`;
+
+            // Agrégats globaux
+            const avgTemp = bmsState.zones.reduce((a, z) => a + z.temp, 0) / bmsState.zones.length;
+            const avgSp = bmsState.zones.reduce((a, z) => a + getZoneTargetTemp(z), 0) / bmsState.zones.length;
+            const maxCo2 = Math.max(...bmsState.zones.map(z => z.co2));
+            const avgCo2 = Math.round(bmsState.zones.reduce((a, z) => a + z.co2, 0) / bmsState.zones.length);
+            const totalFlow = bmsState.zones.reduce((a, z) => a + z.flow, 0);
+            const avgLight = Math.round(bmsState.zones.reduce((a, z) => a + z.lightPct, 0) / bmsState.zones.length);
+            const avgBlinds = Math.round(bmsState.zones.reduce((a, z) => a + z.blindsPct, 0) / bmsState.zones.length);
+
+            const co2MetaMax = getCo2ColorMeta(maxCo2);
+
+            // KPIs Header & Bandeau
+            document.getElementById('nav-kpi-kw').textContent = `${bmsState.power.totalGross.toFixed(1)} kW`;
+            document.getElementById('nav-kpi-co2').textContent = `${avgCo2} ppm`;
+            document.getElementById('kpi-mode-tag').textContent = BUILDING_MODES[bmsState.mode].tag;
+            document.getElementById('kpi-avg-temp').textContent = `${avgTemp.toFixed(1)} °C`;
+            document.getElementById('kpi-avg-sp').textContent = `Consigne: ${avgSp.toFixed(1)}°C`;
+
+            document.getElementById('kpi-max-co2').textContent = `${maxCo2} ppm`;
+            document.getElementById('kpi-max-co2').className = `text-2xl font-mono font-extrabold ${co2MetaMax.text}`;
+            document.getElementById('kpi-co2-status').textContent = co2MetaMax.badge;
+            document.getElementById('kpi-co2-status').className = `px-2 py-0.5 rounded font-mono text-[10px] font-bold ${co2MetaMax.badgeCls}`;
+            document.getElementById('kpi-total-flow').textContent = `Débit: ${totalFlow.toLocaleString('fr-FR')} m³/h`;
+
+            document.getElementById('kpi-power-kw').textContent = `${bmsState.power.totalGross.toFixed(1)} kW`;
+            document.getElementById('kpi-solar-kw').textContent = `PV: -${bmsState.power.solarPv.toFixed(1)} kW`;
+
+            // État SSI & CTA
+            const ctaEl = document.getElementById('kpi-cta-state');
+            const ssiBadge = document.getElementById('kpi-ssi-badge');
+            if (bmsState.fireAlarmActive) {
+                ctaEl.textContent = 'CTA : ARRÊT SÉCURITÉ';
+                ctaEl.className = 'text-sm sm:text-base font-mono font-extrabold text-red-400';
+                ssiBadge.textContent = 'ALARME FEU';
+                ssiBadge.className = 'px-2 py-0.5 rounded bg-red-500/20 text-red-300 font-mono text-[10px] font-bold alarm-flash';
+            } else {
+                ctaEl.textContent = 'CTA : MARCHE AUTO';
+                ctaEl.className = 'text-sm sm:text-base font-mono font-extrabold text-white';
+                ssiBadge.textContent = 'VEILLE NORMALE';
+                ssiBadge.className = 'px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-mono text-[10px] font-bold';
+            }
+
+            // Mise à jour Synoptique Isométrique SVG
+            document.getElementById('iso-cta-sub').textContent = bmsState.fireAlarmActive ? 'CTA: ARRÊT SSI' : `CTA: ${totalFlow} m³/h`;
+            document.getElementById('iso-light-sub').textContent = `Gradation: ${avgLight}%`;
+            document.getElementById('iso-meter-sub').textContent = `Net: ${bmsState.power.totalNet.toFixed(1)} kW`;
+            document.getElementById('iso-blinds-sub').textContent = `Fermeture: ${avgBlinds}%`;
+            document.getElementById('iso-sec-sub').textContent = bmsState.fireAlarmActive ? 'SSI : ALARME FEU' : 'SSI : Normal';
+            document.getElementById('iso-sec-sub').setAttribute('fill', bmsState.fireAlarmActive ? '#EF4444' : '#10B981');
+            document.getElementById('iso-sec-card').setAttribute('stroke', bmsState.fireAlarmActive ? '#EF4444' : '#38BDF8');
+
+            bmsState.zones.forEach(z => {
+                const poly = document.getElementById(`poly-${z.id}`);
+                const txt = document.getElementById(`iso-txt-${z.id}`);
+                const cMeta = getCo2ColorMeta(z.co2);
+                const isSelected = z.id === bmsState.selectedZoneId;
+                const isFire = bmsState.fireAlarmActive && bmsState.fireZoneId === z.id;
+
+                if (poly) {
+                    poly.setAttribute('stroke', isFire ? '#EF4444' : (isSelected ? '#38BDF8' : '#334155'));
+                    poly.setAttribute('stroke-width', (isSelected || isFire) ? '3' : '1.8');
+                    poly.setAttribute('fill', isFire ? '#450A0A' : (isSelected ? '#1E293B' : '#111827'));
+                }
+                if (txt) {
+                    txt.textContent = `${z.temp.toFixed(1)}°C • ${z.co2} ppm`;
+                    txt.setAttribute('fill', cMeta.hex);
+                }
+            });
+
+            // Mise à jour Panneau Détail Zone Sélectionnée
+            const sel = getZone(bmsState.selectedZoneId);
+            const selTarget = getZoneTargetTemp(sel);
+            const selCo2Meta = getCo2ColorMeta(sel.co2);
+
+            document.getElementById('zone-detail-floor').textContent = `${sel.floor.toUpperCase()} • ZONE SUPERVISÉE`;
+            document.getElementById('zone-detail-name').textContent = sel.name;
+            document.getElementById('zone-detail-desc').textContent = sel.desc;
+
+            document.getElementById('zd-temp').textContent = `${sel.temp.toFixed(1)} °C`;
+            document.getElementById('zd-sp').textContent = `Cons: ${selTarget.toFixed(1)}°C`;
+            document.getElementById('zd-co2').textContent = `${sel.co2} ppm`;
+            document.getElementById('zd-co2').className = `text-xl font-mono font-extrabold ${selCo2Meta.text}`;
+            document.getElementById('zd-co2-badge').textContent = selCo2Meta.badge;
+            document.getElementById('zd-co2-badge').className = `px-2 py-0.5 rounded text-[10px] font-mono font-extrabold ${selCo2Meta.badgeCls}`;
+            document.getElementById('zd-occ').textContent = `${sel.occ} / ${sel.maxOcc} pers.`;
+            document.getElementById('zd-co2-bar').className = `h-full transition-all duration-300 ${selCo2Meta.bgBar}`;
+            document.getElementById('zd-co2-bar').style.width = `${Math.min(100, Math.round((sel.co2 / 1600) * 100))}%`;
+
+            document.getElementById('zd-flow').textContent = `${sel.flow} m³/h`;
+            document.getElementById('zd-damper').textContent = `Reg: ${sel.damperPct}%`;
+            document.getElementById('zd-valve-state').textContent = `Vanne terminal : ${sel.valvePct}% • CCF : ${sel.fireDamper}`;
+            document.getElementById('zd-light').textContent = `${sel.lightPct} %`;
+            document.getElementById('zd-blinds').textContent = `Stores: ${sel.blindsPct}%`;
+
+            // Pilules de sélection rapide des 6 zones
+            document.getElementById('zone-pills-bar').innerHTML = bmsState.zones.map(z => {
+                const active = z.id === bmsState.selectedZoneId;
+                return `
+                    <button type="button" onclick="selectZone('${z.id}')" class="px-2 py-1.5 rounded-lg border text-[11px] font-bold truncate transition cursor-pointer ${active ? 'bg-dexCyan text-dexBg border-dexCyan' : 'bg-dexBg border-dexBorder text-slate-300 hover:text-white'}">
+                        ${z.name}
+                    </button>
+                `;
+            }).join('');
+
+            // Mini-grille des 6 zones
+            document.getElementById('all-zones-mini-grid').innerHTML = bmsState.zones.map(z => {
+                const cm = getCo2ColorMeta(z.co2);
+                const active = z.id === bmsState.selectedZoneId;
+                return `
+                    <div onclick="selectZone('${z.id}')" class="p-2.5 rounded-xl bg-dexBg border ${active ? 'border-dexCyan' : 'border-dexBorder'} hover:border-slate-500 cursor-pointer flex items-center justify-between text-xs">
+                        <div>
+                            <div class="font-bold text-white">${z.name}</div>
+                            <div class="font-mono text-[10px] text-slate-400">VAV ${z.damperPct}% (${z.flow} m³/h)</div>
+                        </div>
+                        <div class="text-right font-mono">
+                            <div class="font-extrabold text-white">${z.temp.toFixed(1)}°C</div>
+                            <div class="text-[11px] font-bold ${cm.text}">${z.co2} ppm</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            // Onglet Énergie KPIs
+            const hourlyCost = (bmsState.power.totalNet * bmsState.config.kwhPrice).toFixed(2);
+            const projectedKwhM2 = Math.round(62 + bmsState.power.totalNet * 0.95);
+            document.getElementById('en-total-kw').textContent = `${bmsState.power.totalGross.toFixed(1)} kW`;
+            document.getElementById('en-net-kw').textContent = `Réseau: ${bmsState.power.totalNet.toFixed(1)} kW`;
+            document.getElementById('en-cost-hour').textContent = `${hourlyCost} €/h`;
+            document.getElementById('en-tarif-ref').textContent = `${bmsState.config.kwhPrice.toFixed(2)} €/kWh`;
+            document.getElementById('en-kwh-m2').textContent = `${projectedKwhM2} kWh/m².an`;
+            document.getElementById('en-lots-summary').innerHTML = `
+                <div>Chauffage: ${bmsState.power.heating} kW • Vent: ${bmsState.power.ventilation} kW</div>
+                <div>Clim: ${bmsState.power.cooling} kW • Écl/Aux: ${bmsState.power.lightingAux} kW</div>
+            `;
+
+            // Onglet SSI & Journal Alarmes
+            refreshSsiAndAlarms();
+
+            // Dessin des graphiques si onglet Énergie visible
+            if (bmsState.activeTab === 'energy') {
+                drawEnergyCharts();
+            }
+        }
+
+        function refreshSsiAndAlarms() {
+            const unackCount = bmsState.alarms.filter(a => !a.ack).length;
+            const navCounter = document.getElementById('nav-alarm-counter');
+            navCounter.textContent = unackCount;
+            navCounter.className = unackCount > 0
+                ? 'px-2 py-0.5 rounded-full text-[11px] font-mono font-extrabold bg-red-500/20 text-red-300 border border-red-500/50 alarm-flash'
+                : 'px-2 py-0.5 rounded-full text-[11px] font-mono font-extrabold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40';
+
+            // États asservissements SSI
+            document.getElementById('ssi-val-cta').textContent = bmsState.fireAlarmActive ? 'ARRÊT RÉFLEXE SÉCURITÉ' : 'MARCHE NORMALE';
+            document.getElementById('ssi-val-cta').className = `font-mono font-extrabold text-sm ${bmsState.fireAlarmActive ? 'text-red-400' : 'text-emerald-400'}`;
+
+            document.getElementById('ssi-val-ccf').textContent = bmsState.fireAlarmActive ? 'FERMÉS (COMPARTIMENTAGE)' : 'ARMÉS / OUVERTS';
+            document.getElementById('ssi-val-ccf').className = `font-mono font-extrabold text-sm ${bmsState.fireAlarmActive ? 'text-red-400' : 'text-emerald-400'}`;
+
+            document.getElementById('ssi-val-desenf').textContent = bmsState.fireAlarmActive ? 'OUVERTS 100 % (EXTRACTION)' : 'FERMÉS (VEILLE)';
+            document.getElementById('ssi-val-desenf').className = `font-mono font-extrabold text-sm ${bmsState.fireAlarmActive ? 'text-amber-400' : 'text-slate-300'}`;
+
+            document.getElementById('ssi-val-issues').textContent = bmsState.fireAlarmActive ? 'DÉVERROUILLÉES (ÉVACUATION)' : 'VERROUILLAGE BADGE';
+            document.getElementById('ssi-val-issues').className = `font-mono font-extrabold text-sm ${bmsState.fireAlarmActive ? 'text-amber-400' : 'text-dexCyan'}`;
+
+            // Matrice zones SSI
+            document.getElementById('ssi-zones-matrix').innerHTML = bmsState.zones.map(z => {
+                const isFire = bmsState.fireAlarmActive && bmsState.fireZoneId === z.id;
+                return `
+                    <div class="p-2.5 rounded-xl bg-dexBg border ${isFire ? 'border-red-500 bg-red-950/30' : 'border-dexBorder'} flex flex-wrap items-center justify-between gap-2 text-xs">
+                        <div>
+                            <strong class="text-white">${z.name}</strong>
+                            <span class="ml-2 font-mono text-[11px] ${isFire ? 'text-red-400 font-bold' : 'text-emerald-400'}">DI: ${z.smokeDetector}</span>
+                            <span class="ml-2 font-mono text-[11px] text-slate-400">CCF: ${z.fireDamper}</span>
+                        </div>
+                        <button type="button" onclick="triggerFireAlarm('${z.id}')" class="px-2.5 py-1 rounded-lg bg-red-500/15 hover:bg-red-600 text-red-300 hover:text-white text-[11px] font-bold transition cursor-pointer">
+                            Simuler Feu Zone
+                        </button>
+                    </div>
+                `;
+            }).join('');
+
+            // Liste Journal d'alarmes
+            document.getElementById('alarm-log-list').innerHTML = bmsState.alarms.map(al => {
+                let badge = 'bg-sky-500/15 text-sky-400 border-sky-500/30';
+                let label = 'INFO';
+                if (al.type === 'WARN') { badge = 'bg-amber-500/20 text-amber-300 border-amber-500/40'; label = 'PRÉ-ALARME'; }
+                if (al.type === 'CRIT') { badge = 'bg-red-500/20 text-red-300 border-red-500/40'; label = 'DÉFAUT'; }
+                if (al.type === 'FIRE') { badge = 'bg-red-600 text-white border-red-300'; label = 'INCENDIE'; }
+
+                return `
+                    <div class="p-3 rounded-xl bg-dexBg border ${al.ack ? 'border-dexBorder/70 opacity-75' : 'border-amber-500/60'} flex items-start justify-between gap-3 text-xs">
+                        <div class="space-y-1">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span class="font-mono text-slate-400">${al.time}</span>
+                                <span class="px-2 py-0.5 rounded border font-mono text-[10px] font-extrabold ${badge}">${label}</span>
+                                <strong class="text-white">${al.zone}</strong>
+                            </div>
+                            <p class="text-slate-300 leading-snug">${al.msg}</p>
+                        </div>
+                        ${!al.ack
+                            ? `<button type="button" onclick="acknowledgeAlarm(${al.id})" class="px-2.5 py-1 rounded-lg bg-dexSurface hover:bg-dexCyan hover:text-dexBg text-dexCyan font-bold text-[11px] shrink-0 transition cursor-pointer">Acquitter</button>`
+                            : `<span class="text-[10px] font-mono text-emerald-400 shrink-0">✓ Acquitté</span>`
+                        }
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // =====================================================================
+        // 7. GRAPHIQUES ÉNERGÉTIQUES & CLIMATIQUES CANVAS HAUTE NETTETÉ
+        // =====================================================================
+        function drawEnergyCharts() {
+            drawPowerBreakdownCanvas();
+            drawClimateCo2Canvas();
+        }
+
+        function drawPowerBreakdownCanvas() {
+            const canvas = document.getElementById('energy-power-canvas');
+            if (!canvas) return;
+            const rect = canvas.parentElement.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            const w = Math.max(280, rect.width - 16);
+            const h = Math.max(220, rect.height - 16);
+            canvas.width = Math.round(w * dpr);
+            canvas.height = Math.round(h * dpr);
+
+            const ctx = canvas.getContext('2d');
+            ctx.save();
+            ctx.scale(dpr, dpr);
+
+            const padL = 46, padR = 18, padT = 18, padB = 26;
+            const plotW = w - padL - padR;
+            const plotH = h - padT - padB;
+            const maxKw = 65;
+
+            ctx.strokeStyle = '#1E293B';
+            ctx.font = '10px "JetBrains Mono", monospace';
+            for (let i = 0; i <= 5; i++) {
+                const y = padT + (plotH * i) / 5;
+                ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(w - padR, y); ctx.stroke();
+                ctx.fillStyle = '#94A3B8';
+                ctx.textAlign = 'right';
+                ctx.fillText(`${Math.round(maxKw * (1 - i / 5))}kW`, padL - 6, y + 3);
+            }
+
+            const hist = bmsState.history;
+            if (hist.length < 2) { ctx.restore(); return; }
+
+            const toX = (idx) => padL + (idx / (hist.length - 1)) * plotW;
+            const toY = (kw) => padT + plotH - (Math.min(maxKw, Math.max(0, kw)) / maxKw) * plotH;
+
+            const plotSeries = (key, color, width, dash = []) => {
+                ctx.save();
+                ctx.strokeStyle = color;
+                ctx.lineWidth = width;
+                ctx.setLineDash(dash);
+                ctx.beginPath();
+                hist.forEach((pt, i) => {
+                    const x = toX(i), y = toY(pt[key]);
+                    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                });
+                ctx.stroke();
+                ctx.restore();
+            };
+
+            plotSeries('total', '#F8FAFC', 2.6);
+            plotSeries('heat', '#EA580C', 2.0);
+            plotSeries('vent', '#38BDF8', 2.0);
+            plotSeries('solar', '#10B981', 1.8, [5, 4]);
+
+            ctx.fillStyle = '#64748B';
+            ctx.textAlign = 'center';
+            [0, Math.floor(hist.length / 2), hist.length - 1].forEach(idx => {
+                if (hist[idx]) ctx.fillText(hist[idx].label, toX(idx), h - 8);
+            });
+
+            ctx.restore();
+        }
+
+        function drawClimateCo2Canvas() {
+            const canvas = document.getElementById('climate-co2-canvas');
+            if (!canvas) return;
+            const rect = canvas.parentElement.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            const w = Math.max(280, rect.width - 16);
+            const h = Math.max(220, rect.height - 16);
+            canvas.width = Math.round(w * dpr);
+            canvas.height = Math.round(h * dpr);
+
+            const ctx = canvas.getContext('2d');
+            ctx.save();
+            ctx.scale(dpr, dpr);
+
+            const padL = 44, padR = 48, padT = 18, padB = 26;
+            const plotW = w - padL - padR;
+            const plotH = h - padT - padB;
+
+            ctx.strokeStyle = '#1E293B';
+            ctx.font = '10px "JetBrains Mono", monospace';
+            for (let i = 0; i <= 5; i++) {
+                const y = padT + (plotH * i) / 5;
+                ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(w - padR, y); ctx.stroke();
+
+                const tempVal = 40 - i * 10; // -10°C à +40°C
+                const co2Val = 1600 - i * 240; // 400 à 1600 ppm
+
+                ctx.fillStyle = '#94A3B8';
+                ctx.textAlign = 'right';
+                ctx.fillText(`${tempVal}°C`, padL - 6, y + 3);
+
+                ctx.fillStyle = '#F59E0B';
+                ctx.textAlign = 'left';
+                ctx.fillText(`${co2Val}`, w - padR + 6, y + 3);
+            }
+
+            const hist = bmsState.history;
+            if (hist.length < 2) { ctx.restore(); return; }
+
+            const toX = (idx) => padL + (idx / (hist.length - 1)) * plotW;
+            const toYTemp = (t) => padT + plotH - ((Math.max(-10, Math.min(40, t)) + 10) / 50) * plotH;
+            const toYCo2 = (c) => padT + plotH - ((Math.max(400, Math.min(1600, c)) - 400) / 1200) * plotH;
+
+            // T° Ext
+            ctx.save(); ctx.strokeStyle = '#38BDF8'; ctx.lineWidth = 2; ctx.setLineDash([5, 4]);
+            ctx.beginPath();
+            hist.forEach((pt, i) => { const x = toX(i), y = toYTemp(pt.extTemp); if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); });
+            ctx.stroke(); ctx.restore();
+
+            // T° Int
+            ctx.save(); ctx.strokeStyle = '#10B981'; ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            hist.forEach((pt, i) => { const x = toX(i), y = toYTemp(pt.intTemp); if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); });
+            ctx.stroke(); ctx.restore();
+
+            // CO2 Moyen
+            ctx.save(); ctx.strokeStyle = '#F59E0B'; ctx.lineWidth = 2.2;
+            ctx.beginPath();
+            hist.forEach((pt, i) => { const x = toX(i), y = toYCo2(pt.co2); if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); });
+            ctx.stroke(); ctx.restore();
+
+            ctx.fillStyle = '#64748B';
+            ctx.textAlign = 'center';
+            [0, Math.floor(hist.length / 2), hist.length - 1].forEach(idx => {
+                if (hist[idx]) ctx.fillText(hist[idx].label, toX(idx), h - 8);
+            });
+
+            ctx.restore();
+        }
+
+        // =====================================================================
+        // 8. MODULE DE 10 CAS PRATIQUES (PÉDAGOGIE & DÉPANNAGE CVC/GTB)
+        // =====================================================================
+        function selectCaseStudy(idx) {
+            bmsState.currentCaseIdx = idx;
+            renderPracticalCasesModule();
+        }
+
+        function answerCaseStudy(optIdx) {
+            const idx = bmsState.currentCaseIdx;
+            bmsState.caseAnswers[idx] = optIdx;
+            renderPracticalCasesModule();
+            const isOk = optIdx === BMS_PRACTICAL_CASES[idx].correct;
+            showToast(isOk ? 'Diagnostic validé ! Excellente analyse GTB/CVC.' : 'Réponse incorrecte — Lisez la correction technique.', isOk ? 'success' : 'error');
+        }
+
+        function applyCaseToBuilding(idx) {
+            const c = BMS_PRACTICAL_CASES[idx];
+            if (c && typeof c.simAction === 'function') {
+                c.simAction();
+                switchMainTab('synoptic');
+                showToast(`Scénario #${c.id} injecté sur la supervision du bâtiment !`, 'warn');
+            }
+        }
+
+        function renderPracticalCasesModule() {
+            let score = 0;
+            BMS_PRACTICAL_CASES.forEach((c, i) => {
+                if (bmsState.caseAnswers[i] === c.correct) score++;
+            });
+            document.getElementById('nav-quiz-badge').textContent = `${score} / 10`;
+            document.getElementById('quiz-score-big').textContent = `${score} / 10`;
+
+            document.getElementById('cases-selector-grid').innerHTML = BMS_PRACTICAL_CASES.map((c, idx) => {
+                const active = idx === bmsState.currentCaseIdx;
+                const answered = bmsState.caseAnswers[idx] !== undefined;
+                const ok = answered && bmsState.caseAnswers[idx] === c.correct;
+
+                let cls = 'bg-dexSurface border-dexBorder text-slate-300 hover:border-slate-500';
+                if (active) cls = 'bg-dexCyan text-dexBg border-dexCyan font-extrabold shadow';
+                else if (answered) cls = ok ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300' : 'bg-red-500/20 border-red-500/50 text-red-300';
+
+                return `
+                    <button type="button" onclick="selectCaseStudy(${idx})" class="py-2 px-2 rounded-xl border text-xs font-mono font-bold transition cursor-pointer ${cls}">
+                        Cas #${idx + 1} ${answered ? (ok ? '✓' : '✗') : ''}
+                    </button>
+                `;
+            }).join('');
+
+            const c = BMS_PRACTICAL_CASES[bmsState.currentCaseIdx];
+            const chosen = bmsState.caseAnswers[bmsState.currentCaseIdx];
+            const answered = chosen !== undefined;
+
+            document.getElementById('case-detail-panel').innerHTML = `
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span class="px-2.5 py-1 rounded-lg border text-xs font-bold ${c.badgeClass}">${c.category}</span>
+                        <span class="font-mono text-xs text-slate-400">Cas Pratique ${bmsState.currentCaseIdx + 1} / 10</span>
+                    </div>
+                    <button type="button" onclick="applyCaseToBuilding(${bmsState.currentCaseIdx})" class="px-3 py-1.5 rounded-xl bg-dexOrange/20 hover:bg-dexOrange/30 border border-dexOrange/50 text-orange-300 text-xs font-extrabold transition cursor-pointer">
+                        🏢 Charger la situation sur la supervision →
+                    </button>
+                </div>
+
+                <div>
+                    <h3 class="text-base sm:text-lg font-extrabold text-white">${c.title}</h3>
+                    <p class="text-xs sm:text-sm text-slate-300 leading-relaxed mt-2">${c.context}</p>
+                </div>
+
+                <div class="p-3 rounded-xl bg-dexCard border border-dexBorder font-mono text-xs text-dexCyan">
+                    <strong>Relevés Télémétrie GTB :</strong> ${c.symptom}
+                </div>
+
+                <div class="text-xs sm:text-sm font-bold text-white">${c.question}</div>
+
+                <div class="space-y-2.5">
+                    ${c.options.map((opt, oIdx) => {
+                        let style = 'bg-dexCard hover:bg-dexSurface border-dexBorder text-slate-200';
+                        let letterCls = 'bg-dexBg text-slate-400 border-dexBorder';
+                        if (answered) {
+                            if (oIdx === c.correct) {
+                                style = 'bg-emerald-950/50 border-emerald-500 text-emerald-200';
+                                letterCls = 'bg-emerald-500 text-dexBg border-emerald-400';
+                            } else if (oIdx === chosen) {
+                                style = 'bg-red-950/50 border-red-500 text-red-200';
+                                letterCls = 'bg-red-500 text-white border-red-400';
+                            } else {
+                                style = 'bg-dexCard/50 border-dexBorder/50 text-slate-500';
+                            }
+                        }
+                        return `
+                            <button type="button" onclick="answerCaseStudy(${oIdx})" class="w-full text-left p-3.5 rounded-xl border text-xs sm:text-sm font-medium flex items-start gap-3 transition cursor-pointer ${style}">
+                                <span class="w-6 h-6 rounded-lg border flex items-center justify-center font-mono font-extrabold text-xs shrink-0 ${letterCls}">
+                                    ${['A', 'B', 'C'][oIdx]}
+                                </span>
+                                <span class="leading-snug pt-0.5">${opt}</span>
+                            </button>
+                        `;
+                    }).join('')}
+                </div>
+
+                ${answered ? `
+                    <div class="p-4 rounded-xl border ${chosen === c.correct ? 'bg-emerald-950/30 border-emerald-500/40' : 'bg-amber-950/30 border-amber-500/40'} space-y-2">
+                        <div class="text-xs font-extrabold uppercase tracking-wider ${chosen === c.correct ? 'text-emerald-400' : 'text-amber-400'}">
+                            ${chosen === c.correct ? '✓ Diagnostic Correct — Validation Ingénierie GTB' : '⚠ Correction & Analyse Technique CVC / GTB'}
+                        </div>
+                        <p class="text-xs sm:text-sm text-slate-200 leading-relaxed">${c.explanation}</p>
+                        <div class="pt-2 flex justify-end">
+                            <button type="button" onclick="selectCaseStudy(${(bmsState.currentCaseIdx + 1) % BMS_PRACTICAL_CASES.length})" class="px-4 py-2 rounded-xl bg-dexCyan text-dexBg text-xs font-extrabold cursor-pointer">
+                                Scénario suivant →
+                            </button>
+                        </div>
+                    </div>
+                ` : ''}
+            `;
+        }
+
+        // =====================================================================
+        // 9. NAVIGATION, CONFIGURATION & EXPORT RAPPORT PDF
+        // =====================================================================
+        function switchMainTab(tab) {
+            bmsState.activeTab = tab;
+            const tabs = ['synoptic', 'energy', 'ssi', 'cases'];
+            tabs.forEach(t => {
+                document.getElementById(`view-${t}`).classList.toggle('hidden', t !== tab);
+                const btn = document.getElementById(`nav-tab-${t}`);
+                if (!btn) return;
+                const isFlex = (t === 'ssi' || t === 'cases') ? ' flex items-center gap-2' : '';
+                btn.className = t === tab
+                    ? `px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-dexCyan text-dexBg shadow-md shrink-0 transition cursor-pointer${isFlex}`
+                    : `px-4 py-2 rounded-xl text-xs sm:text-sm font-bold text-slate-300 hover:bg-dexSurface shrink-0 transition cursor-pointer${isFlex}`;
+            });
+            if (tab === 'energy') setTimeout(drawEnergyCharts, 40);
+        }
+
+        function toggleConfigDrawer() {
+            document.getElementById('config-drawer').classList.toggle('hidden');
+        }
+
+        function applyQuickConfig() {
+            bmsState.config.co2Warn = parseInt(document.getElementById('cfg-co2-warn').value, 10) || 800;
+            bmsState.config.co2Crit = parseInt(document.getElementById('cfg-co2-crit').value, 10) || 1200;
+            bmsState.config.baseConfortTemp = parseFloat(document.getElementById('cfg-temp-confort').value) || 21.0;
+            bmsState.config.baseNightTemp = parseFloat(document.getElementById('cfg-temp-nuit').value) || 16.5;
+            bmsState.config.kwhPrice = parseFloat(document.getElementById('cfg-kwh-price').value) || 0.21;
+            showToast('Paramètres globaux GTB mis à jour.');
+            refreshAllUI();
+        }
+
+        function exportPdfReport() {
+            const now = new Date();
+            document.getElementById('print-date-stamp').textContent = `Édité le ${now.toLocaleDateString('fr-FR')} à ${now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`;
+
+            let score = 0;
+            BMS_PRACTICAL_CASES.forEach((c, i) => {
+                if (bmsState.caseAnswers[i] === c.correct) score++;
+            });
+
+            document.getElementById('print-report-body').innerHTML = `
+                <div class="p-4 rounded-xl border border-slate-300 bg-slate-50 grid grid-cols-3 gap-4 text-xs font-mono">
+                    <div>Mode Bâtiment : <strong>${BUILDING_MODES[bmsState.mode].label}</strong></div>
+                    <div>T° Extérieure : <strong>${bmsState.outdoorTemp.toFixed(1)} °C</strong></div>
+                    <div>État SSI : <strong>${bmsState.fireAlarmActive ? 'ALARME FEU ACTIVE' : 'VEILLE NORMALE'}</strong></div>
+                </div>
+
+                <div>
+                    <h2 class="text-base font-extrabold border-b border-slate-300 pb-1 mb-2">1. Relevé d'État des Zones CVC / QAI</h2>
+                    <table class="w-full text-left border-collapse text-xs font-mono">
+                        <tr class="border-b border-slate-300 bg-slate-100">
+                            <th class="p-2">Zone</th>
+                            <th class="p-2">T° Amb / Cons.</th>
+                            <th class="p-2">CO₂ (ppm)</th>
+                            <th class="p-2">Débit Air Neuf</th>
+                            <th class="p-2">Clapet CCF</th>
+                        </tr>
+                        ${bmsState.zones.map(z => `
+                            <tr class="border-b border-slate-200">
+                                <td class="p-2 font-bold">${z.name}</td>
+                                <td class="p-2">${z.temp.toFixed(1)}°C / ${getZoneTargetTemp(z).toFixed(1)}°C</td>
+                                <td class="p-2">${z.co2} ppm</td>
+                                <td class="p-2">${z.flow} m³/h (${z.damperPct}%)</td>
+                                <td class="p-2">${z.fireDamper}</td>
+                            </tr>
+                        `).join('')}
+                    </table>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="p-4 rounded-xl border border-slate-300">
+                        <h3 class="font-bold text-slate-900 mb-1">2. Bilan Énergétique Instantané</h3>
+                        <ul class="text-xs space-y-1 font-mono">
+                            <li>Puissance Totale Appelée : <strong>${bmsState.power.totalGross} kW</strong></li>
+                            <li>Production Solaire PV : <strong>${bmsState.power.solarPv} kW</strong></li>
+                            <li>Puissance Nette Réseau : <strong>${bmsState.power.totalNet} kW</strong></li>
+                        </ul>
+                    </div>
+                    <div class="p-4 rounded-xl border border-slate-300">
+                        <h3 class="font-bold text-slate-900 mb-1">3. Validation Compétences Technicien</h3>
+                        <p class="text-xs">Score obtenu au module de dépannage GTB/CVC : <strong class="font-mono text-base">${score} / 10</strong></p>
+                    </div>
+                </div>
+            `;
+
+            showToast("Génération du rapport d'intervention PDF...");
+            setTimeout(() => window.print(), 250);
+        }
+
+        function showToast(msg, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            let style = 'border-dexCyan/50 bg-dexCard text-white';
+            let dot = 'bg-dexCyan';
+            if (type === 'success') { style = 'border-emerald-500/50 bg-dexCard text-emerald-300'; dot = 'bg-emerald-400'; }
+            else if (type === 'warn') { style = 'border-amber-500/50 bg-dexCard text-amber-300'; dot = 'bg-amber-400'; }
+            else if (type === 'error') { style = 'border-red-500/60 bg-dexCard text-red-300'; dot = 'bg-red-500'; }
+
+            toast.className = `pointer-events-auto px-4 py-2.5 rounded-xl border shadow-2xl text-xs font-semibold flex items-center gap-2.5 transition-all duration-300 ${style}`;
+            toast.innerHTML = `<span class="w-2 h-2 rounded-full ${dot}"></span><span>${msg}</span>`;
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(8px)';
+                setTimeout(() => toast.remove(), 280);
+            }, 2800);
+        }
+
+        window.addEventListener('resize', () => {
+            if (bmsState.activeTab === 'energy') drawEnergyCharts();
+        });
+
+        // =====================================================================
+        // 10. DÉMARRAGE INITIAL DU SUPERVISEUR GTB
+        // =====================================================================
+        window.onload = function () {
+            // Pré-remplissage de 25 points d'historique énergétique réaliste
+            bmsState.simMinutes = 10 * 60 + 5;
+            for (let i = 0; i < 25; i++) {
+                stepBuildingSimulation();
+            }
+
+            renderPracticalCasesModule();
+            refreshAllUI();
+
+            // Boucle temps réel GTB
+            setInterval(() => {
+                if (!bmsState.paused) {
+                    for (let s = 0; s < bmsState.speed; s++) {
+                        stepBuildingSimulation();
+                    }
+                    refreshAllUI();
+                }
+            }, 1200);
+        };
+    </script>
+</body>
+</html>
